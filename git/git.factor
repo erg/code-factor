@@ -1,8 +1,8 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: compression.zlib io io.binary io.directories.search
-io.encodings.binary io.encodings.utf8 io.files io.pathnames
-kernel namespaces prettyprint sequences
+USING: arrays compression.zlib io io.binary
+io.directories.search io.encodings.binary io.encodings.utf8
+io.files io.pathnames kernel namespaces prettyprint sequences
 sequences.generalizations tools.hexdump ;
 IN: git
 
@@ -40,8 +40,6 @@ ERROR: not-a-git-directory path ;
 : git-head-contents ( -- contents )
     "HEAD" git-utf8-contents ;
 
-
-
 : git-stash-contents ( -- contents )
     "stash" git-utf8-contents ;
 
@@ -54,23 +52,34 @@ ERROR: not-a-git-directory path ;
 ERROR: index-entry-expected ;
 
 : read-index-entry ( -- seq )
-    { 0 } read-until [ index-entry-expected ] unless
-    3 read 0 prefix
-    40 read
+    4 read
+    4 read 2array
+
+    4 read
+    4 read 2array
+
+    4 read
+    4 read
+    4 read
+    4 read
+    4 read
+    4 read 6 narray
+
     20 read
-    2 read 5 narray ;
+
+    2 read
+    { 0 } read-until [ index-entry-expected ] unless
+    [ utf8 decode ] [ length ] bi
+    ! XXX: awkward calulation, can be simplified
+    8 mod dup zero? [ 8 swap - ] unless 1 + 8 mod read drop
+    6 narray ;
 
 : git-index-contents ( -- bytes )
     "index" make-git-path binary [
         4 read .
         4 read be> .
         4 read be>
-        62 read hexdump.
-        ! 512 read hexdump.
         [ read-index-entry ] replicate
         "rest" print
         contents length .
     ] with-file-reader ;
-
-! : parse-index ( bytes -- index )
-!    character-parser
