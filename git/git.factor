@@ -1,12 +1,12 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays calendar checksums checksums.sha
-combinators combinators.smart compression.zlib constructors io
-io.binary io.directories.search io.encodings.binary
+combinators combinators.smart compression.zlib constructors
+grouping io io.binary io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
 io.pathnames io.streams.byte-array kernel math math.parser
 namespaces prettyprint sequences sequences.generalizations
-splitting tools.hexdump grouping ;
+splitting strings tools.hexdump ;
 IN: git
 
 : find-git-directory ( path -- path' )
