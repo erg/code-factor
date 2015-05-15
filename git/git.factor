@@ -4,9 +4,9 @@ USING: accessors arrays calendar checksums checksums.sha
 combinators combinators.smart compression.zlib constructors
 grouping io io.binary io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
-io.pathnames io.streams.byte-array kernel math math.parser
-namespaces prettyprint sequences sequences.generalizations
-splitting strings tools.hexdump ;
+io.pathnames io.streams.byte-array io.streams.peek kernel math
+math.bitwise math.parser namespaces prettyprint sequences
+sequences.generalizations splitting strings tools.hexdump ;
 IN: git
 
 : find-git-directory ( path -- path' )
@@ -49,15 +49,20 @@ ERROR: not-a-git-directory path ;
 : git-object-contents ( hash -- contents )
     make-object-path binary file-contents uncompress ;
 
-TUPLE: index-entry ctime mtime data sha1 flags name ;
-CONSTRUCTOR: <index-entry> index-entry ( ctime mtime data sha1 flags name -- obj ) ;
+TUPLE: index-entry ctime mtime dev ino mode uid gid size sha1 flags name ;
+CONSTRUCTOR: <index-entry> index-entry ( ctime mtime dev ino mode uid gid size sha1 flags name -- obj ) ;
 
 : read-index-entry-v2 ( -- seq )
     4 read be> 4 read be> 2array
     4 read be> 4 read be> 2array
-    4 read 4 read 4 read 4 read 4 read 4 read 6 narray
+    4 read be>
+    4 read be>
+    4 read be>
+    4 read be>
+    4 read be>
+    4 read be>
     20 read hex-string
-    2 read { 0 } read-until drop [ utf8 decode ] [ length ] bi
+    2 read be> { 0 } read-until drop [ utf8 decode ] [ length ] bi
     7 + 8 mod dup zero? [ 8 swap - ] unless read drop
     <index-entry> ;
 
@@ -163,11 +168,59 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
         } case
     ] with-file-reader ;
 
+! https://schacon.github.io/gitbook/7_the_packfile.html
+
+! pair is flags, length
+
+ERROR: byte-expected ;
+SYMBOL: #bits
+: read-length ( -- pair/f )
+B
+    0 #bits [
+        read1 dup .h [
+            [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
+            0x80 mask? [
+                #bits [ 4 + ] change
+                [
+                    peek1 [ byte-expected ] unless
+                    read1 [
+                        7 bits #bits get shift bitor
+                        #bits [ 7 + ] change
+                    ] [ 0x80 mask? ] bi
+                ] loop
+            ] when 2array
+        ] [
+            f
+        ] if*
+    ] with-variable ;
+
+: read-packed ( -- obj/f )
+    read-length dup . [
+        dup second read 2array
+    ] [
+        f
+    ] if* ;
+
+TUPLE: pack magic version count objects sha1 ;
 : parse-pack ( path -- pack )
     binary [
+        input-stream [ <peek-stream> ] change
+        1024 peek hexdump.
         4 read >string
         4 read be>
         4 read be> 3array
+        ! 512 peek hexdump.
+        ! read-packed .
+        ! 256 peek hexdump.
+        ! read-packed .
+        ! 256 peek hexdump.
+        ! read-packed .
+        ! 256 peek hexdump.
+        ! read-packed .
+        ! 256 peek hexdump.
+        [ peek1 ] [ B read-packed ] produce 2array
+        ! read-length dup second read >string 3array ! 3 read 3array ! dup [ dup second read ] [ f ] if* 2array
+        ! 256 read hexdump.
     ] with-file-reader ;
 
 : git-read-idx ( sha -- obj )
@@ -175,3 +228,6 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
 
 : git-read-pack ( sha -- obj )
     make-pack-path parse-pack ;
+
+! "/Users/erg/factor" set-current-directory
+! "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
