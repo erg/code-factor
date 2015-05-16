@@ -1,12 +1,13 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays calendar checksums checksums.sha
-combinators combinators.smart compression.zlib constructors
+combinators combinators.smart compression.zlib constructors fry
 grouping io io.binary io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
 io.pathnames io.streams.byte-array io.streams.peek kernel math
-math.bitwise math.parser namespaces prettyprint sequences
-sequences.generalizations splitting strings tools.hexdump ;
+math.bitwise math.parser namespaces nested-comments prettyprint
+sequences sequences.generalizations splitting strings
+tools.hexdump ;
 IN: git
 
 : find-git-directory ( path -- path' )
@@ -172,10 +173,20 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
 
 ! pair is flags, length
 
+CONSTANT: OBJ_BAD -1
+CONSTANT: OBJ_NONE 0
+CONSTANT: OBJ_COMMIT 1
+CONSTANT: OBJ_TREE 2
+CONSTANT: OBJ_BLOB 3
+CONSTANT: OBJ_TAG 4
+CONSTANT: OBJ_OFS_DELTA 6
+CONSTANT: OBJ_REF_DELTA 7
+CONSTANT: OBJ_ANY 8
+CONSTANT: OBJ_MAX 9
+
 ERROR: byte-expected ;
 SYMBOL: #bits
 : read-length ( -- pair/f )
-B
     0 #bits [
         read1 dup .h [
             [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
@@ -194,33 +205,32 @@ B
         ] if*
     ] with-variable ;
 
+! XXX: actual length is stored in the gzip header
+! We add 256 instead of using it for now.
 : read-packed ( -- obj/f )
     read-length dup . [
-        dup second read 2array
+        dup second tell-input . dup . 256 + read 2array
     ] [
         f
     ] if* ;
 
+: parse-packed-object ( sha1 offset -- obj )
+    [ make-pack-path binary ] dip '[
+        input-stream [ <peek-stream> ] change
+        _ seek-absolute seek-input read-packed
+    ] with-file-reader ;
+
+! http://stackoverflow.com/questions/18010820/git-the-meaning-of-object-size-returned-by-git-verify-pack
 TUPLE: pack magic version count objects sha1 ;
 : parse-pack ( path -- pack )
     binary [
         input-stream [ <peek-stream> ] change
-        1024 peek hexdump.
+        ! 1024 peek hexdump.
         4 read >string
         4 read be>
         4 read be> 3array
-        ! 512 peek hexdump.
-        ! read-packed .
-        ! 256 peek hexdump.
-        ! read-packed .
-        ! 256 peek hexdump.
-        ! read-packed .
-        ! 256 peek hexdump.
-        ! read-packed .
-        ! 256 peek hexdump.
-        [ peek1 ] [ B read-packed ] produce 2array
-        ! read-length dup second read >string 3array ! 3 read 3array ! dup [ dup second read ] [ f ] if* 2array
-        ! 256 read hexdump.
+        read-packed 2array
+        ! [ peek1 ] [ read-packed ] produce 2array
     ] with-file-reader ;
 
 : git-read-idx ( sha -- obj )
@@ -229,5 +239,37 @@ TUPLE: pack magic version count objects sha1 ;
 : git-read-pack ( sha -- obj )
     make-pack-path parse-pack ;
 
-! "/Users/erg/factor" set-current-directory
-! "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
+(*
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
+
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
+5 head .
+
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" 12 parse-packed-object
+first2 [ . ] [ print ] bi*
+
+
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
+[ third ] map
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ parse-packed-object ] with map
+
+
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
+[ third ] map
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ dup . flush tuck parse-packed-object ] with { } map>assoc
+[ [ . ] dip first2 [ . flush ] [  uncompress >string print ] bi* ] assoc-each
+
+
+
+"/Users/erg/factor" set-current-directory
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
+[ third ] map
+"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ dup . flush tuck parse-packed-object ] with { } map>assoc
+[ [ "offset:" write . ] dip first2 swap dup . first { 6 7 } member? [ hexdump. ] [ uncompress >string print ] if ] assoc-each
+
+*)
