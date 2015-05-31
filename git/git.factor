@@ -1,13 +1,14 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors arrays calendar checksums checksums.sha
-combinators combinators.smart compression.zlib constructors fry
-grouping io io.binary io.directories.search io.encodings.binary
-io.encodings.string io.encodings.utf8 io.files io.files.info
-io.pathnames io.streams.byte-array io.streams.peek kernel math
-math.bitwise math.parser namespaces nested-comments prettyprint
-sequences sequences.generalizations splitting strings
-tools.hexdump ;
+USING: accessors arrays assocs calendar calendar.format
+checksums checksums.sha combinators combinators.smart
+compression.zlib constructors fry grouping io io.binary
+io.directories.search io.encodings.binary io.encodings.string
+io.encodings.utf8 io.files io.files.info io.pathnames
+io.streams.byte-array io.streams.peek kernel math math.bitwise
+math.parser math.statistics namespaces nested-comments
+prettyprint sequences sequences.generalizations splitting
+strings tools.hexdump ;
 IN: git
 
 : find-git-directory ( path -- path' )
@@ -29,23 +30,29 @@ ERROR: not-a-git-directory path ;
 : make-object-path ( str -- path )
     [ "objects/" make-git-path ] dip 2 cut append-path append-path ;
 
-: git-utf8-contents ( str -- contents )
-    make-git-path utf8 file-contents ;
+: make-idx-path ( sha -- path )
+    "objects/pack/pack-" ".idx" surround make-git-path ;
+
+: make-pack-path ( sha -- path )
+    "objects/pack/pack-" ".pack" surround make-git-path ;
 
 : git-binary-contents ( str -- contents )
     make-git-path binary file-contents ;
 
-: list-refs ( -- seq )
-    current-git-directory "refs/" append-path f recursive-directory-files ;
+: git-utf8-contents ( str -- contents )
+    make-git-path utf8 file-contents ;
 
-: ref-contents ( str -- contents )
-    make-refs-path utf8 file-contents ;
+: git-lines ( str -- contents )
+    make-git-path utf8 file-lines ;
 
-: git-head-contents ( -- contents )
-    "HEAD" git-utf8-contents ;
+ERROR: expected-one-line lines ;
 
-: git-stash-contents ( -- contents )
-    "stash" git-utf8-contents ;
+: git-line ( str -- contents )
+    git-lines dup length 1 =
+    [ first ] [ expected-one-line ] if ;
+
+: git-unpacked-object-exists? ( hash -- ? )
+    make-object-path exists? ;
 
 : git-object-contents ( hash -- contents )
     make-object-path binary file-contents uncompress ;
@@ -107,8 +114,28 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
         [ name>> file-info modified>> timestamp>unix-time >integer ] bi = not
     ] filter ;
 
-TUPLE: commit tree parent author committer comment ;
+TUPLE: commit hash tree parent author committer message ;
 CONSTRUCTOR: <commit> commit ( tree parent author committer -- obj ) ;
+
+: last2 ( seq -- penultimate ultimate ) 2 tail* first2 ;
+
+: gmt-offset>duration ( string -- duration )
+    3 cut [ string>number ] bi@
+    [ hours ] [ minutes ] bi* time+ ;
+
+: date>string ( seq -- string )
+    last2
+    [ string>number unix-time>timestamp ]
+    [ gmt-offset>duration [ time+ ] [ >>gmt-offset ] bi ] bi*
+    timestamp>git-time ;
+
+: commit. ( commit -- )
+    {
+        [ hash>> "commit " prepend print ]
+        [ author>> "Author: " prepend " " split 2 head* " " join print ]
+        [ author>> " " split date>string "Date:   " prepend print ]
+        [ message>> "\n" split [ "    " prepend ] map "\n" join nl print nl ]
+    } cleave ;
 
 ERROR: unknown-commit-line line name ;
 
@@ -117,33 +144,41 @@ ERROR: string-expected got expected ;
 : expect-string ( string expected -- )
     2dup = [ 2drop ] [ string-expected ] if ;
 
+ERROR: eof-too-early ;
+ERROR: unknown-field field ;
+
+: parse-commit-field ( obj parameter -- obj )
+    [ "\r\n" read-until [ eof-too-early ] unless ] dip {
+        { "tree" [ >>tree ] }
+        { "parent" [ >>parent ] }
+        { "author" [ >>author ] }
+        { "committer" [ >>committer ] }
+        [ unknown-field ]
+    } case ;
+
+ERROR: unexpected-text text ;
+
+: parse-commit-lines ( obj -- obj )
+    " \n" read-until {
+        { CHAR: \s [ parse-commit-field parse-commit-lines ] }
+        { CHAR: \n [ drop contents >>message ] }
+        [ unexpected-text ]
+    } case ;
+
 : parse-commit ( bytes -- commit )
-    [ commit new ] dip utf8 [
-        " " read-until drop "tree" expect-string "\r\n" read-until drop >>tree
-        " " read-until drop "parent" expect-string "\r\n" read-until drop >>parent
-        " " read-until drop "author" expect-string "\r\n" read-until drop >>author
-        " " read-until drop "committer" expect-string "\r\n" read-until drop >>committer
-        "\r\n" read-until 2drop
-        contents >>comment
-    ] with-byte-reader ;
+    utf8 [ commit new parse-commit-lines ] with-byte-reader ;
 
 ERROR: unknown-git-object string ;
 
 : git-read-object ( sha -- obj )
-    git-object-contents utf8 [
+    dup git-object-contents utf8 [
         { 0 } read-until 0 = drop " " split1 string>number read swap {
-            { "blob" [ ] }
-            { "commit" [ parse-commit ] }
-            { "tree" [ ] }
+            { "blob" [ nip ] }
+            { "commit" [ parse-commit swap >>hash ] }
+            { "tree" [ nip ] }
             [ unknown-git-object ]
         } case
     ] with-byte-reader ;
-
-: make-idx-path ( sha -- path )
-    "objects/pack/pack-" ".idx" surround make-git-path ;
-
-: make-pack-path ( sha -- path )
-    "objects/pack/pack-" ".pack" surround make-git-path ;
 
 ERROR: idx-v1-unsupported ;
 
@@ -155,11 +190,11 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
     4 read be>
     256 4 * read 4 group [ be> ] map
     dup last
-    [ [ 20 read ] replicate ]
+    [ [ 20 read hex-string ] replicate ]
     [ [ 4 read ] replicate ]
     [ [ 4 read be> ] replicate ] tri 3array flip
-    20 read
-    20 read <idx> ;
+    20 read hex-string
+    20 read hex-string <idx> ;
 
 : parse-idx ( path -- idx )
     binary [
@@ -239,37 +274,62 @@ TUPLE: pack magic version count objects sha1 ;
 : git-read-pack ( sha -- obj )
     make-pack-path parse-pack ;
 
+: parsed-idx>hash ( seq -- hash )
+    H{ } clone [
+        '[
+            [ packfile-sha1>> ]
+            [ triples>> ] bi
+            [ first _ set-at ] with each
+        ] each
+    ] keep ;
+
+: git-parse-all-idx ( -- seq )
+    "objects/pack/" make-git-path qualified-directory-files
+    [ ".idx" tail? ] filter
+    [ parse-idx ] map
+    parsed-idx>hash ;
+
+ERROR: no-pack-for sha1 ;
+
+: find-pack-for ( sha1 -- pack )
+    git-parse-all-idx ?at [ no-pack-for ] unless make-pack-path ;
+
+: parsed-idx>hash2 ( seq -- hash )
+    [
+        [ triples>> [ [ drop f ] [ first ] bi ] [ set-at ] sequence>hashtable ]
+        [ packfile-sha1>> ] bi
+    ] [ set-at ] sequence>hashtable ; inline
+
+
+ERROR: expected-ref got ;
+
+: parse-ref-line ( string -- string' )
+    " " split1 [
+        dup "ref:" = [ drop ] [ expected-ref ] if
+    ] dip ;
+
+
+: list-refs ( -- seq )
+    current-git-directory "refs/" append-path f recursive-directory-files ;
+
+: ref-contents ( str -- line ) make-refs-path git-line ;
+: git-stash-ref-sha1 ( -- contents ) "stash" ref-contents ;
+: git-ref ( ref -- sha1 ) git-line parse-ref-line ;
+: git-head-ref ( -- sha1 ) "HEAD" git-ref ;
+: git-log-for-ref ( ref -- log ) git-line git-read-object ;
+: git-head-object ( -- commit ) git-head-ref git-log-for-ref ;
+
+: git-log ( -- log )
+    git-head-object [
+        parent>> [
+            dup git-unpacked-object-exists?
+            [ git-read-object ] [ drop f ] if
+        ] [
+            f
+        ] if*
+    ] follow ;
+
 (*
 "/Users/erg/factor" set-current-directory
 "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
-5 head .
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" 12 parse-packed-object
-first2 [ . ] [ print ] bi*
-
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
-[ third ] map
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ parse-packed-object ] with map
-
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
-[ third ] map
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ dup . flush tuck parse-packed-object ] with { } map>assoc
-[ [ . ] dip first2 [ . flush ] [  uncompress >string print ] bi* ] assoc-each
-
-
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-idx triples>> { { third <=> } } sort-by
-[ third ] map
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" swap [ dup . flush tuck parse-packed-object ] with { } map>assoc
-[ [ "offset:" write . ] dip first2 swap dup . first { 6 7 } member? [ hexdump. ] [ uncompress >string print ] if ] assoc-each
-
 *)
