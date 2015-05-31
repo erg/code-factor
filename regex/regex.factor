@@ -10,14 +10,14 @@ IN: regex
 TUPLE: character-parser string { n integer initial: 0 } ;
 CONSTRUCTOR: <character-parser> character-parser ( string -- obj ) ;
 
-TUPLE: regexp-tree
+TUPLE: regex-tree
     string
     character-parser
     stack
     character-classes
     { character-class-level integer initial: 0 }
-    regexp-tree ;
-CONSTRUCTOR: <regexp-tree> regexp-tree ( string -- obj )
+    regex-tree ;
+CONSTRUCTOR: <regex-tree> regex-tree ( string -- obj )
     dup string>> <character-parser> >>character-parser
     V{ } clone >>stack
     V{ } clone >>character-classes ;
@@ -38,7 +38,8 @@ CONSTRUCTOR: <tagged-epsilon> tagged-epsilon ( tag -- obj ) ;
 TUPLE: character-range from to ;
 CONSTRUCTOR: <character-range> character-range ( from to -- obj ) ;
 TUPLE: character ch ;
-CONSTRUCTOR: <character> character ( ch -- obj ) ;
+: <character> ( ch -- ch ) ;
+! CONSTRUCTOR: <character> character ( ch -- obj ) ;
 TUPLE: character-class classes ;
 CONSTRUCTOR: <character-class> character-class ( classes -- obj ) ;
 TUPLE: negated-character-class classes ;
@@ -56,7 +57,7 @@ unmatchable-class terminator-class word-boundary-class ;
 SINGLETONS: beginning-of-input ^ end-of-input $ end-of-file
 ^unix $unix word-break ;
 
-: character-parser ( -- obj ) \ regexp-tree get character-parser>> ;
+: character-parser ( -- obj ) \ regex-tree get character-parser>> ;
 : still-parsing? ( ? -- ? )
     {
         [ ]
@@ -74,14 +75,14 @@ SINGLETONS: beginning-of-input ^ end-of-input $ end-of-file
     2dup [ 1 - ] dip bounds-check? [ subseq ] [ nip swap tail f like ] if ;
 
 : ?last ( seq -- elt/f ) [ length 1 - ] [ ?nth ] bi ;
-    
+
 : lookahead ( n -- string/f )
     [ character-parser n>> dup ] dip + character-parser string>> ?subseq ;
 
 : advance-n ( n -- )
     [ character-parser ] dip '[ _ + ] change-n drop ;
 
-ERROR: expected regexp-parser string ;
+ERROR: expected regex-parser string ;
 
 :: expect ( string -- )
     string
@@ -90,10 +91,10 @@ ERROR: expected regexp-parser string ;
     ] [
         character-parser string expected
     ] if ;
-    
+
 : take ( n -- string )
     [ lookahead ] [ advance-n ] bi ;
-    
+
 :: take? ( string -- string )
     string length lookahead string =
     [ string length advance-n t ] [ f ] if ;
@@ -112,30 +113,30 @@ ERROR: expected regexp-parser string ;
 : take-character-class ( -- string )
     "[:" expect [ current letter? ] take-while ":" expect ;
 
-: regexp-tree ( -- regexp-tree ) \ regexp-tree get ;
-: stack ( -- seq ) regexp-tree stack>> ;
-: push-regexp-tree ( obj -- ) stack push ;
-: pop-regexp-tree ( -- obj ) stack pop ;
-: current-regexp ( -- seq ) stack last ;
-: push-current-regexp ( obj -- ) current-regexp push ;
-: pop-current-regexp ( -- obj ) current-regexp pop ;
-: peek1 ( -- obj/f ) current-regexp [ length 1 - ] keep ?nth ;
-: peek2 ( -- obj/f ) current-regexp [ length 2 - ] keep ?nth ;
+: regex-tree ( -- regex-tree ) \ regex-tree get ;
+: stack ( -- seq ) regex-tree stack>> ;
+: push-regex-tree ( obj -- ) stack push ;
+: pop-regex-tree ( -- obj ) stack pop ;
+: current-regex ( -- seq ) stack last ;
+: push-current-regex ( obj -- ) current-regex push ;
+: pop-current-regex ( -- obj ) current-regex pop ;
+: peek1 ( -- obj/f ) current-regex [ length 1 - ] keep ?nth ;
+: peek2 ( -- obj/f ) current-regex [ length 2 - ] keep ?nth ;
 : unless-alternation ( quot -- )
     [ peek2 alternation = ] dip unless ; inline
 : stack1 ( word -- )
-    '[ pop-current-regexp _ execute( obj -- obj ) push-current-regexp ] unless-alternation ;
+    '[ pop-current-regex _ execute( obj -- obj ) push-current-regex ] unless-alternation ;
 : stack2 ( word -- )
     '[
-        current-regexp length 1 > [
-            pop-current-regexp pop-current-regexp swap
-            _ execute( obj obj -- obj ) push-current-regexp
+        current-regex length 1 > [
+            pop-current-regex pop-current-regex swap
+            _ execute( obj obj -- obj ) push-current-regex
         ] when
     ] unless-alternation ;
-: new-nested-regexp ( -- )
-    V{ } clone push-regexp-tree ;
+: new-nested-regex ( -- )
+    V{ } clone push-regex-tree ;
 
-: character-classes ( -- obj ) regexp-tree character-classes>> ;
+: character-classes ( -- obj ) regex-tree character-classes>> ;
 : pop-character-class ( -- obj ) character-classes pop ;
 : push-character-class ( obj -- ) character-classes push ;
 : peek-character-class ( -- obj ) character-classes ?last ;
@@ -143,14 +144,14 @@ ERROR: expected regexp-parser string ;
 : peek-class ( -- obj ) character-classes last classes>> ?last ;
 : push-class ( obj -- ) character-classes last classes>> push ;
 : new-character-class ( -- )
-    regexp-tree [ 1 + ] change-character-class-level drop
+    regex-tree [ 1 + ] change-character-class-level drop
     V{ } clone <character-class> push-character-class ;
 : negate-character-class ( -- )
     pop-character-class dup negated-character-class?
     [ classes>> <character-class> ] [ classes>> <negated-character-class> ] if
     push-character-class ;
 : still-parsing-character-class? ( -- ? )
-    regexp-tree character-class-level>> 0 > ;
+    regex-tree character-class-level>> 0 > ;
 
 : parse-character-class-first ( -- )
     current {
@@ -184,8 +185,8 @@ CONSTRUCTOR: <difference-class> difference-class ( seq -- obj ) ;
         pop-character-class
     ] [
         character-classes <union-class>
-        V{ } clone regexp-tree character-classes<<
-    ] if push-current-regexp ;
+        V{ } clone regex-tree character-classes<<
+    ] if push-current-regex ;
 
 : 2class-stack ( word -- )
     character-classes length 2 >= [
@@ -196,7 +197,7 @@ CONSTRUCTOR: <difference-class> difference-class ( seq -- obj ) ;
     ] if ;
 
 : nested-character-class? ( -- ? )
-    regexp-tree character-class-level>> 1 > ;
+    regex-tree character-class-level>> 1 > ;
 
 DEFER: parse-character-class
 DEFER: parse-nested-character-class
@@ -207,7 +208,7 @@ DEFER: parse-escape
         { [ dup "[" head? ] [ drop parse-nested-character-class ] }
         { [ dup "]" head? ] [
                 drop
-                regexp-tree [ 1 - ] change-character-class-level drop
+                regex-tree [ 1 - ] change-character-class-level drop
                 advance ] }
         { [ dup "||" head? ]
             [ drop 2 advance-n parse-nested-character-class \ <union-class> 2class-stack ] }
@@ -254,7 +255,7 @@ ERROR: invalid-repetition ;
         ] }
         { CHAR: } [ dup advance ] }
     } case
-    pop-current-regexp <repetition> push-current-regexp ;
+    pop-current-regex <repetition> push-current-regex ;
 
 : finalize ( stack -- obj )
     { alternation } split
@@ -263,16 +264,16 @@ ERROR: invalid-repetition ;
 
 DEFER: parse-char
 
-: finish-nested-regexp ( -- )
-    pop-regexp-tree finalize
+: finish-nested-regex ( -- )
+    pop-regex-tree finalize
     stack empty? [
-        push-regexp-tree
+        push-regex-tree
     ] [
-        push-current-regexp
+        push-current-regex
     ] if ;
 
-: parse-new-regexp ( -- )
-    new-nested-regexp
+: parse-new-regex ( -- )
+    new-nested-regex
     [ current parse-char still-parsing? ] loop ;
 
 ! (?P<name>group)
@@ -328,8 +329,8 @@ CONSTRUCTOR: <comment> comment ( string -- obj ) ;
 : parse-loop ( -- )
     [ current parse-char still-parsing? ] loop ;
 
-: parse-nested-regexp ( -- )
-    new-nested-regexp
+: parse-nested-regex ( -- )
+    new-nested-regex
     3 lookahead {
         { [ dup "?<=" head? ] [ drop 3 advance-n parse-loop \ <positive-lookbehind> stack1 ] } ! positive lookbehind
         { [ dup "?<!" head? ] [ drop 3 advance-n parse-loop \ <negative-lookbehind> stack1 ] } ! negative lookbehind
@@ -337,7 +338,7 @@ CONSTRUCTOR: <comment> comment ( string -- obj ) ;
         { [ dup "?=" head? ] [ drop 2 advance-n parse-loop \ <positive-lookahead> stack1 ] } ! lookahead
         { [ dup "?!" head? ] [ drop 2 advance-n parse-loop \ <negative-lookahead> stack1 ] } ! negative lookahead
         ! { [ dup "?~" head? ] [ drop 2 advance-n parse-loop ] } ! negation of parentheses group
-        { [ dup "?#" head? ] [ drop 2 advance-n [ current CHAR: ) = not ] take-while <comment> push-current-regexp ] } ! comment
+        { [ dup "?#" head? ] [ drop 2 advance-n [ current CHAR: ) = not ] take-while <comment> push-current-regex ] } ! comment
         { [ dup "?:" head? ] [ drop 2 advance-n parse-loop \ <noncapturing> stack1 ] } ! noncapturing
         { [ dup "?>" head? ] [ drop 2 advance-n parse-loop \ <atomic> stack1 ] } ! atomic options (independent/non-capture)
         { [ dup "?-" head? ] [ drop 2 advance-n parse-loop \ <negated-options> stack1 ] } ! minus options
@@ -345,12 +346,12 @@ CONSTRUCTOR: <comment> comment ( string -- obj ) ;
         [ drop ]
     } cond ;
 
-ERROR: extra-right-parenthesis regexp ;
+ERROR: extra-right-parenthesis regex ;
 
-ERROR: unbalanced-regexp regexp ;
+ERROR: unbalanced-regex regex ;
 
 : check-balance ( -- )
-    stack length 1 > [ regexp-tree extra-right-parenthesis ] unless ;
+    stack length 1 > [ regex-tree extra-right-parenthesis ] unless ;
 
 :: at-error ( key assoc quot: ( key -- replacement ) -- value )
     key assoc at* [ drop key quot call ] unless ; inline
@@ -442,7 +443,7 @@ ERROR: bad-number ;
         { "P{" [ 2 advance-n [ current CHAR: } = not ] take-while name>class <primitive-class> <not-class> advance t ] }
         [ f ]
     } case
-    [ 
+    [
         drop
         current {
             { CHAR: Q [ advance [ 2 lookahead "\\E" = not ] take-while <concatenation> 2 advance-n ] }
@@ -456,33 +457,33 @@ ERROR: bad-number ;
 ! # is a comment in free-space mode
 : parse-char ( ch -- ? )
     {
-        { CHAR: . [ dot push-current-regexp t advance ] }
-        { CHAR: \ [ parse-escape push-current-regexp t ] }
+        { CHAR: . [ dot push-current-regex t advance ] }
+        { CHAR: \ [ parse-escape push-current-regex t ] }
         { CHAR: ? [ \ <maybe> stack1 t advance ] }
         { CHAR: * [ \ <star> stack1 t advance ] }
         { CHAR: + [ \ <plus> stack1 t advance ] }
-        { CHAR: | [ \ alternation push-current-regexp t advance ] }
+        { CHAR: | [ \ alternation push-current-regex t advance ] }
         { CHAR: [ [ parse-character-class t ] }
-        { CHAR: ( [ advance parse-nested-regexp t ] }
-        { CHAR: ) [ check-balance finish-nested-regexp f advance ] }
+        { CHAR: ( [ advance parse-nested-regex t ] }
+        { CHAR: ) [ check-balance finish-nested-regex f advance ] }
         { CHAR: { [ parse-repetition t ] }
-        { CHAR: ^ [ ^ <tagged-epsilon> push-current-regexp t advance ] }
-        { CHAR: $ [ $ <tagged-epsilon> push-current-regexp t advance ] }
-        [ <character> push-current-regexp t advance ]
+        { CHAR: ^ [ ^ <tagged-epsilon> push-current-regex t advance ] }
+        { CHAR: $ [ $ <tagged-epsilon> push-current-regex t advance ] }
+        [ <character> push-current-regex t advance ]
     } case ;
 
-: parse-string ( string -- tree )
-    <regexp-tree> \ regexp-tree [
-        parse-new-regexp
-        pop-regexp-tree
-        stack empty? [ regexp-tree unbalanced-regexp ] unless 
-        finalize regexp-tree regexp-tree<<
-        regexp-tree
+: parse-regex ( string -- tree )
+    <regex-tree> \ regex-tree [
+        parse-new-regex
+        pop-regex-tree
+        stack empty? [ regex-tree unbalanced-regex ] unless
+        finalize regex-tree regex-tree<<
+        regex-tree
     ] with-variable ;
 
-: or-regexp-trees ( seq -- seq' )
+: or-regex-trees ( seq -- seq' )
     [ stack>> first ] map <alternation> ;
 
 ! dup rules>> [ user-agents>> V{ "*" } = ] filter
-! first allows>> [ present parse-string ] map or-regexp-trees
+! first allows>> [ present parse-string ] map or-regex-trees
 
