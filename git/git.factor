@@ -6,9 +6,9 @@ compression.zlib constructors fry grouping io io.binary
 io.directories io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
 io.pathnames io.streams.byte-array io.streams.peek kernel math
-math.bitwise math.parser math.statistics namespaces
+math.bitwise math.parser math.statistics memoize namespaces
 nested-comments prettyprint sequences sequences.generalizations
-splitting strings tools.hexdump memoize ;
+splitting strings threads tools.hexdump ;
 IN: git
 
 : find-git-directory ( path -- path' )
@@ -253,15 +253,14 @@ CONSTANT: OBJ_MAX 9
 
 ERROR: byte-expected ;
 SYMBOL: #bits
-: read-length ( -- pair/f )
+: read-type-length ( -- pair/f )
     0 #bits [
         read1 [
             [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
             0x80 mask? [
                 #bits [ 4 + ] change
                 [
-                    peek1 [ byte-expected ] unless
-                    read1 [
+                    read1 [ byte-expected ] unless* [
                         7 bits #bits get shift bitor
                         #bits [ 7 + ] change
                     ] [ 0x80 mask? ] bi
@@ -272,18 +271,39 @@ SYMBOL: #bits
         ] if*
     ] with-variable ;
 
-! XXX: actual length is stored in the gzip header
-! We add 256 instead of using it for now.
-: read-packed ( -- obj/f )
-    read-length [
-        first2 swap {
-            { 1 [ 256 + read uncompress parse-object ] }
-            { 6 [ "unknown packed type 6" throw ] }
-            [ number>string "unknown packed type: " prepend throw ]
-        } case
+: read-length ( -- length )
+    read1 [
+        dup 0x80 mask? [
+            7 bits
+            [
+                read1 [ byte-expected ] unless* [
+                    [ 1 + 7 shift ] [ 7 bits ] bi* bitor
+                ] [ 0x80 mask? ] bi
+            ] loop
+        ] when
     ] [
         f
     ] if* ;
+
+! XXX: actual length is stored in the gzip header
+! We add 256 instead of using it for now.
+
+DEFER: git-object-from-pack
+
+SYMBOL: initial-offset
+: read-packed ( -- obj/f )
+    tell-input initial-offset [
+        read-type-length [
+            first2 swap {
+                { 1 [ 256 + read uncompress parse-object ] }
+                { 6 [ read-length neg initial-offset get + seek-absolute seek-input drop read-packed ] } ! OBJ_OFS_DELTA
+                { 7 [ drop B 20 read hex-string git-object-from-pack ] }
+                [ number>string "unknown packed type: " prepend throw ]
+            } case
+        ] [
+            f
+        ] if*
+    ] with-variable ;
 
 : parse-packed-object ( sha1 offset -- obj )
     [ make-pack-path binary ] dip '[
@@ -361,18 +381,27 @@ ERROR: expected-ref got ;
 : git-config ( -- config )
     "config" make-git-path ;
 
+
+SYMBOL: parents
+ERROR: repeated-parent-hash hash ;
 : git-log ( -- log )
-    git-head-object [
-        parent>> [
-            dup "parent: " prepend print flush
-            dup git-unpacked-object-exists?
-            [ git-read-object ] [ git-object-from-pack ] if
-        ] [ f ] if*
-    ] follow ;
+    H{ } clone parents [
+        git-head-object [
+            parent>> [
+                [ parents get 2dup key? [ repeated-parent-hash ] when dupd set-at ] keep
+                dup "parent: " prepend print flush yield
+                dup git-unpacked-object-exists?
+                [ git-read-object ] [ git-object-from-pack ] if
+            ] [ f ] if*
+        ] follow
+    ] with-variable ;
 
 (*
 "/Users/erg/factor" set-current-directory
 "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
+
+"/Users/erg/factor" set-current-directory
+git-log
 
 git verify-pack -v .git/objects/pack/pack-816d07912ac9f9b463f89b7e663298e3c8fedda5.pack | grep a6e0867b
 a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaeebc4452c6cccbec68069ca1
@@ -380,4 +409,7 @@ a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaee
 
 ! investigate:
 http://stackoverflow.com/questions/9478023/is-the-git-binary-diff-algorithm-delta-storage-standardized/9478566#9478566
+
+http://stackoverflow.com/questions/801577/how-to-recover-git-objects-damaged-by-hard-disk-failure
+git ls-tree
 *)
