@@ -373,4 +373,8 @@ ERROR: expected-ref got ;
 (*
 "/Users/erg/factor" set-current-directory
 "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
+
+git verify-pack -v .git/objects/pack/pack-816d07912ac9f9b463f89b7e663298e3c8fedda5.pack | grep a6e0867b
+a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaeebc4452c6cccbec68069ca1
+! problem: a6e0867b2222f3b0976e9aac6539fe8f12a552e2
 *)
