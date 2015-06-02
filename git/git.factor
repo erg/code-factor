@@ -3,12 +3,12 @@
 USING: accessors arrays assocs calendar calendar.format
 checksums checksums.sha combinators combinators.smart
 compression.zlib constructors fry grouping io io.binary
-io.directories.search io.encodings.binary io.encodings.string
-io.encodings.utf8 io.files io.files.info io.pathnames
-io.streams.byte-array io.streams.peek kernel math math.bitwise
-math.parser math.statistics namespaces nested-comments
-prettyprint sequences sequences.generalizations splitting
-strings tools.hexdump ;
+io.directories io.directories.search io.encodings.binary
+io.encodings.string io.encodings.utf8 io.files io.files.info
+io.pathnames io.streams.byte-array io.streams.peek kernel math
+math.bitwise math.parser math.statistics namespaces
+nested-comments prettyprint sequences sequences.generalizations
+splitting strings tools.hexdump memoize ;
 IN: git
 
 : find-git-directory ( path -- path' )
@@ -80,7 +80,7 @@ CONSTRUCTOR: <git-index> git-index ( magic version entries checksum -- obj ) ;
 ERROR: unhandled-git-version n ;
 ERROR: unhandled-git-index-trailing-bytes bytes ;
 
-: git-index-contents ( -- bytes )
+: git-index-contents ( -- git-index )
     "index" make-git-path binary [
         4 read utf8 decode
         4 read be>
@@ -92,7 +92,7 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
         <git-index>
     ] with-file-reader ;
 
-: make-git-object ( str -- bytes )
+: make-git-object ( str -- obj )
     [
         [ "blob " ] dip [ length number>string "\0" ] [ ] bi
     ] B{ } append-outputs-as ;
@@ -166,19 +166,51 @@ ERROR: unexpected-text text ;
     } case ;
 
 : parse-commit ( bytes -- commit )
-    utf8 [ commit new parse-commit-lines ] with-byte-reader ;
+    " " split1 [ "commit" expect-string ] [ string>number read ] bi*
+    utf8 [
+        commit new parse-commit-lines
+    ] with-byte-reader ;
+
+TUPLE: tree hash tree parent author committer message ;
+CONSTRUCTOR: <tree> tree ( -- obj ) ;
+
+
+: parse-tree-field ( obj parameter -- obj )
+    [ "\r\n" read-until [ eof-too-early ] unless ] dip {
+        { "tree" [ >>tree ] }
+        { "parent" [ >>parent ] }
+        { "author" [ >>author ] }
+        { "committer" [ >>committer ] }
+        [ unknown-field ]
+    } case ;
+
+: parse-tree-lines ( obj -- obj )
+    " \n" read-until {
+        { CHAR: \s [ parse-tree-field parse-tree-lines ] }
+        { CHAR: \n [ drop contents >>message ] }
+        [ unexpected-text ]
+    } case ;
+
+: parse-tree ( bytes -- commit )
+    [ tree new ] dip
+    utf8 [
+        parse-tree-lines
+    ] with-byte-reader ;
 
 ERROR: unknown-git-object string ;
 
-: git-read-object ( sha -- obj )
-    dup git-object-contents utf8 [
-        { 0 } read-until 0 = drop " " split1 string>number read swap {
-            { "blob" [ nip ] }
-            { "commit" [ parse-commit swap >>hash ] }
-            { "tree" [ nip ] }
+: parse-object ( bytes -- git-obj )
+    utf8 [
+        { 0 } read-until 0 = drop dup " " split1 drop {
+            { "blob" [ ] }
+            { "commit" [ parse-commit ] }
+            { "tree" [ parse-tree ] }
             [ unknown-git-object ]
         } case
     ] with-byte-reader ;
+
+: git-read-object ( sha -- obj )
+    [ git-object-contents parse-object ] keep >>hash ;
 
 ERROR: idx-v1-unsupported ;
 
@@ -223,7 +255,7 @@ ERROR: byte-expected ;
 SYMBOL: #bits
 : read-length ( -- pair/f )
     0 #bits [
-        read1 dup .h [
+        read1 [
             [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
             0x80 mask? [
                 #bits [ 4 + ] change
@@ -243,8 +275,8 @@ SYMBOL: #bits
 ! XXX: actual length is stored in the gzip header
 ! We add 256 instead of using it for now.
 : read-packed ( -- obj/f )
-    read-length dup . [
-        dup second tell-input . dup . 256 + read 2array
+    read-length [
+        second 512 + read uncompress parse-object
     ] [
         f
     ] if* ;
@@ -257,15 +289,14 @@ SYMBOL: #bits
 
 ! http://stackoverflow.com/questions/18010820/git-the-meaning-of-object-size-returned-by-git-verify-pack
 TUPLE: pack magic version count objects sha1 ;
+! TUPLE: packed-object sha1 flags offset ;
 : parse-pack ( path -- pack )
     binary [
         input-stream [ <peek-stream> ] change
-        ! 1024 peek hexdump.
         4 read >string
         4 read be>
         4 read be> 3array
-        read-packed 2array
-        ! [ peek1 ] [ read-packed ] produce 2array
+        [ peek1 ] [ read-packed ] produce 2array
     ] with-file-reader ;
 
 : git-read-idx ( sha -- obj )
@@ -279,11 +310,11 @@ TUPLE: pack magic version count objects sha1 ;
         '[
             [ packfile-sha1>> ]
             [ triples>> ] bi
-            [ first _ set-at ] with each
+            [ first3 rot [ 3array ] dip _ set-at ] with each
         ] each
     ] keep ;
 
-: git-parse-all-idx ( -- seq )
+MEMO: git-parse-all-idx ( -- seq )
     "objects/pack/" make-git-path qualified-directory-files
     [ ".idx" tail? ] filter
     [ parse-idx ] map
@@ -291,8 +322,11 @@ TUPLE: pack magic version count objects sha1 ;
 
 ERROR: no-pack-for sha1 ;
 
-: find-pack-for ( sha1 -- pack )
-    git-parse-all-idx ?at [ no-pack-for ] unless make-pack-path ;
+: find-pack-for ( sha1 -- triple )
+    git-parse-all-idx ?at [ no-pack-for ] unless ;
+
+: git-object-from-pack ( sha1 -- pack )
+    find-pack-for [ first ] [ third ] bi parse-packed-object ;
 
 : parsed-idx>hash2 ( seq -- hash )
     [
@@ -308,9 +342,11 @@ ERROR: expected-ref got ;
         dup "ref:" = [ drop ] [ expected-ref ] if
     ] dip ;
 
-
 : list-refs ( -- seq )
     current-git-directory "refs/" append-path f recursive-directory-files ;
+
+: remote-refs-dirs ( -- seq )
+    "remotes" make-refs-path directory-files ;
 
 : ref-contents ( str -- line ) make-refs-path git-line ;
 : git-stash-ref-sha1 ( -- contents ) "stash" ref-contents ;
@@ -318,15 +354,16 @@ ERROR: expected-ref got ;
 : git-head-ref ( -- sha1 ) "HEAD" git-ref ;
 : git-log-for-ref ( ref -- log ) git-line git-read-object ;
 : git-head-object ( -- commit ) git-head-ref git-log-for-ref ;
+: git-config ( -- config )
+    "config" make-git-path ;
 
 : git-log ( -- log )
     git-head-object [
         parent>> [
+            dup "parent: " prepend print flush
             dup git-unpacked-object-exists?
-            [ git-read-object ] [ drop f ] if
-        ] [
-            f
-        ] if*
+            [ git-read-object ] [ git-object-from-pack ] if
+        ] [ f ] if*
     ] follow ;
 
 (*
