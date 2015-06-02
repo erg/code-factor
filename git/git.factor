@@ -377,4 +377,7 @@ ERROR: expected-ref got ;
 git verify-pack -v .git/objects/pack/pack-816d07912ac9f9b463f89b7e663298e3c8fedda5.pack | grep a6e0867b
 a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaeebc4452c6cccbec68069ca1
 ! problem: a6e0867b2222f3b0976e9aac6539fe8f12a552e2
+
+! investigate:
+http://stackoverflow.com/questions/9478023/is-the-git-binary-diff-algorithm-delta-storage-standardized/9478566#9478566
 *)
