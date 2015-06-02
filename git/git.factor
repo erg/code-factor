@@ -202,7 +202,7 @@ ERROR: unknown-git-object string ;
 : parse-object ( bytes -- git-obj )
     utf8 [
         { 0 } read-until 0 = drop dup " " split1 drop {
-            { "blob" [ ] }
+            { "blob" [ "unimplemented blob parsing" throw ] }
             { "commit" [ parse-commit ] }
             { "tree" [ parse-tree ] }
             [ unknown-git-object ]
@@ -276,7 +276,11 @@ SYMBOL: #bits
 ! We add 256 instead of using it for now.
 : read-packed ( -- obj/f )
     read-length [
-        second 512 + read uncompress parse-object
+        first2 swap {
+            { 1 [ 256 + read uncompress parse-object ] }
+            { 6 [ "unknown packed type 6" throw ] }
+            [ number>string "unknown packed type: " prepend throw ]
+        } case
     ] [
         f
     ] if* ;
