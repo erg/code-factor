@@ -124,10 +124,10 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
         [ name>> file-info modified>> timestamp>unix-time >integer ] bi = not
     ] filter ;
 
-TUPLE: commit hash tree parent author committer message ;
-CONSTRUCTOR: <commit> commit ( tree parent author committer -- obj ) ;
+TUPLE: commit hash tree parents author committer message ;
+CONSTRUCTOR: <commit> commit ( tree parents author committer -- obj ) ;
 
-TUPLE: tree hash tree parent author committer message ;
+TUPLE: tree hash tree parents author committer message ;
 CONSTRUCTOR: <tree> tree ( -- obj ) ;
 
 : last2 ( seq -- penultimate ultimate ) 2 tail* first2 ;
@@ -163,7 +163,7 @@ ERROR: unknown-field field ;
 : parse-commit-field ( obj parameter -- obj )
     [ "\r\n" read-until [ eof-too-early ] unless ] dip {
         { "tree" [ >>tree ] }
-        { "parent" [ >>parent ] }
+        { "parent" [ >>parents ] }
         { "author" [ >>author ] }
         { "committer" [ >>committer ] }
         [ unknown-field ]
@@ -189,7 +189,7 @@ ERROR: unexpected-text text ;
 : parse-tree-field ( obj parameter -- obj )
     [ "\r\n" read-until* ] dip {
         { "tree" [ >>tree ] }
-        { "parent" [ >>parent ] }
+        { "parent" [ >>parents ] }
         { "author" [ >>author ] }
         { "committer" [ >>committer ] }
         [ unknown-field ]
@@ -203,16 +203,20 @@ ERROR: unexpected-text text ;
     } case ;
 
 
+ERROR: key-already-set value key assoc ;
+: set-at-once ( value key assoc -- )
+    2dup key? [ key-already-set ] [ set-at ] if ;
+
 : parse-object-line>assoc ( hashtable -- hashtable )
     "\s\n" read-until {
-        { CHAR: \s [ [ "\r\n" read-until* ] dip pick set-at parse-object-line>assoc ] }
+        { CHAR: \s [ [ "\r\n" read-until* ] dip pick over "parent" = [ push-at ] [ set-at-once ] if parse-object-line>assoc ] }
         { CHAR: \n [ drop contents "message" pick set-at ] }
     } case ;
 
 : assoc>commit ( assoc -- commit )
     [ commit new ] dip {
         [ "tree" of >>tree ]
-        [ "parent" of >>parent ]
+        [ "parent" of >>parents ]
         [ "author" of >>author ]
         [ "committer" of >>committer ]
         [ "message" of >>message ]
@@ -431,8 +435,8 @@ TUPLE: pack magic version count objects sha1 ;
 : git-read-idx ( sha -- obj )
     make-idx-path parse-idx ;
 
-: git-read-pack ( sha -- obj )
-    make-pack-path parse-pack ;
+! Broken for now
+! : git-read-pack ( sha -- obj ) make-pack-path parse-pack ;
 
 : parsed-idx>hash ( seq -- hash )
     H{ } clone [
@@ -463,7 +467,6 @@ ERROR: no-pack-for sha1 ;
         [ packfile-sha1>> ] bi
     ] [ set-at ] sequence>hashtable ; inline
 
-
 ERROR: expected-ref got ;
 
 : parse-ref-line ( string -- string' )
@@ -489,50 +492,15 @@ ERROR: expected-ref got ;
 
 SYMBOL: parents
 ERROR: repeated-parent-hash hash ;
+
 : git-log ( -- log )
     H{ } clone parents [
         git-head-object [
-            parent>> [
-                [ parents get 2dup key? [ repeated-parent-hash ] when dupd set-at ] keep
+            parents>> dup string? [ random ] unless [
+                ! [ parents get 2dup key? [ repeated-parent-hash ] when dupd set-at ] keep
                 ! dup "parent: " prepend print flush yield
                 dup git-unpacked-object-exists?
                 [ git-read-object ] [ git-object-from-pack ] if
             ] [ f ] if*
         ] follow
     ] with-variable ;
-
-(*
-
-CONSTANT: OBJ_COMMIT 1
-CONSTANT: OBJ_TREE 2
-CONSTANT: OBJ_BLOB 3
-CONSTANT: OBJ_TAG 4
-CONSTANT: OBJ_OFS_DELTA 6
-CONSTANT: OBJ_REF_DELTA 7
-
-"/Users/erg/factor" set-current-directory
-"3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
-
-"/Users/erg/factor" set-current-directory
-git-log
-
-"/Users/erg/factor" set-current-directory
-"401597a387add5b52111d1dd954d6250ee2b2688" git-object-from-pack
-
-git verify-pack -v .git/objects/pack/pack-816d07912ac9f9b463f89b7e663298e3c8fedda5.pack | grep a6e0867b
-a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaeebc4452c6cccbec68069ca1
-! problem: a6e0867b2222f3b0976e9aac6539fe8f12a552e2
-
-! investigate:
-http://stackoverflow.com/questions/9478023/is-the-git-binary-diff-algorithm-delta-storage-standardized/9478566#9478566
-
-http://stackoverflow.com/questions/801577/how-to-recover-git-objects-damaged-by-hard-disk-failure
-git ls-tree
-
-! eh
-http://schacon.github.io/git/technical/pack-format.txt
-https://schacon.github.io/gitbook/7_the_packfile.html
-
-! most useful doc:
-http://git.rsbx.net/Documents/Git_Data_Formats.txt
-*)
