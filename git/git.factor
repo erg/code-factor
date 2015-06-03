@@ -455,7 +455,7 @@ ERROR: no-pack-for sha1 ;
     git-parse-all-idx ?at [ no-pack-for ] unless ;
 
 : git-object-from-pack ( sha1 -- pack )
-    find-pack-for [ first ] [ third ] bi parse-packed-object ;
+    [ find-pack-for [ first ] [ third ] bi parse-packed-object ] keep >>hash ;
 
 : parsed-idx>hash2 ( seq -- hash )
     [
@@ -494,7 +494,7 @@ ERROR: repeated-parent-hash hash ;
         git-head-object [
             parent>> [
                 [ parents get 2dup key? [ repeated-parent-hash ] when dupd set-at ] keep
-                dup "parent: " prepend print flush yield
+                ! dup "parent: " prepend print flush yield
                 dup git-unpacked-object-exists?
                 [ git-read-object ] [ git-object-from-pack ] if
             ] [ f ] if*
