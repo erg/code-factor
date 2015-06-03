@@ -7,9 +7,19 @@ io.directories io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
 io.pathnames io.streams.byte-array io.streams.peek kernel math
 math.bitwise math.parser math.statistics memoize namespaces
-nested-comments prettyprint sequences sequences.generalizations
-splitting strings threads tools.hexdump ;
+nested-comments prettyprint sequences sequences.extras
+sequences.generalizations splitting strings threads
+tools.hexdump ;
 IN: git
+
+ERROR: byte-expected offset ;
+: read1* ( -- n )
+    read1 [ tell-input byte-expected ] unless* ;
+
+ERROR: separator-expected expected-one-of got ;
+
+: read-until* ( separators -- data )
+    dup read-until [ nip ] [ separator-expected ] if ;
 
 : find-git-directory ( path -- path' )
     [ ".git" tail? ] find-up-to-root ; inline
@@ -117,6 +127,9 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
 TUPLE: commit hash tree parent author committer message ;
 CONSTRUCTOR: <commit> commit ( tree parent author committer -- obj ) ;
 
+TUPLE: tree hash tree parent author committer message ;
+CONSTRUCTOR: <tree> tree ( -- obj ) ;
+
 : last2 ( seq -- penultimate ultimate ) 2 tail* first2 ;
 
 : gmt-offset>duration ( string -- duration )
@@ -171,12 +184,10 @@ ERROR: unexpected-text text ;
         commit new parse-commit-lines
     ] with-byte-reader ;
 
-TUPLE: tree hash tree parent author committer message ;
-CONSTRUCTOR: <tree> tree ( -- obj ) ;
 
 
 : parse-tree-field ( obj parameter -- obj )
-    [ "\r\n" read-until [ eof-too-early ] unless ] dip {
+    [ "\r\n" read-until* ] dip {
         { "tree" [ >>tree ] }
         { "parent" [ >>parent ] }
         { "author" [ >>author ] }
@@ -185,19 +196,46 @@ CONSTRUCTOR: <tree> tree ( -- obj ) ;
     } case ;
 
 : parse-tree-lines ( obj -- obj )
-    " \n" read-until {
+    "\s\n" read-until {
         { CHAR: \s [ parse-tree-field parse-tree-lines ] }
         { CHAR: \n [ drop contents >>message ] }
         [ unexpected-text ]
     } case ;
+
+
+: parse-object-line>assoc ( hashtable -- hashtable )
+    "\s\n" read-until {
+        { CHAR: \s [ [ "\r\n" read-until* ] dip pick set-at parse-object-line>assoc ] }
+        { CHAR: \n [ drop contents "message" pick set-at ] }
+    } case ;
+
+: assoc>commit ( assoc -- commit )
+    [ commit new ] dip {
+        [ "tree" of >>tree ]
+        [ "parent" of >>parent ]
+        [ "author" of >>author ]
+        [ "committer" of >>committer ]
+        [ "message" of >>message ]
+    } cleave ;
+
+ERROR: unknown-git-object obj ;
+: assoc>git-object ( assoc -- git-object )
+    {
+        { [ "committer" over key? ] [ assoc>commit ] }
+        [ unknown-git-object ]
+    } cond ;
+
+: parse-object-bytes>assoc ( obj -- hashtable )
+    utf8 [
+        H{ } clone parse-object-line>assoc assoc>git-object
+    ] with-byte-reader ;
+
 
 : parse-tree ( bytes -- commit )
     [ tree new ] dip
     utf8 [
         parse-tree-lines
     ] with-byte-reader ;
-
-ERROR: unknown-git-object string ;
 
 : parse-object ( bytes -- git-obj )
     utf8 [
@@ -236,73 +274,141 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
         } case
     ] with-file-reader ;
 
-! https://schacon.github.io/gitbook/7_the_packfile.html
-
-! pair is flags, length
-
-CONSTANT: OBJ_BAD -1
-CONSTANT: OBJ_NONE 0
-CONSTANT: OBJ_COMMIT 1
-CONSTANT: OBJ_TREE 2
-CONSTANT: OBJ_BLOB 3
-CONSTANT: OBJ_TAG 4
-CONSTANT: OBJ_OFS_DELTA 6
-CONSTANT: OBJ_REF_DELTA 7
-CONSTANT: OBJ_ANY 8
-CONSTANT: OBJ_MAX 9
-
-ERROR: byte-expected ;
 SYMBOL: #bits
-: read-type-length ( -- pair/f )
-    0 #bits [
-        read1 [
-            [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
-            0x80 mask? [
-                #bits [ 4 + ] change
-                [
-                    read1 [ byte-expected ] unless* [
-                        7 bits #bits get shift bitor
-                        #bits [ 7 + ] change
-                    ] [ 0x80 mask? ] bi
-                ] loop
-            ] when 2array
-        ] [
-            f
-        ] if*
-    ] with-variable ;
 
-: read-length ( -- length )
-    read1 [
-        dup 0x80 mask? [
-            7 bits
+: read-type-length ( -- pair )
+    0 #bits [
+        read1*
+        [ -4 shift 3 bits ] [ 4 bits ] [ ] tri
+        0x80 mask? [
+            #bits [ 4 + ] change
             [
-                read1 [ byte-expected ] unless* [
-                    [ 1 + 7 shift ] [ 7 bits ] bi* bitor
+                read1* [
+                    7 bits #bits get shift bitor
+                    #bits [ 7 + ] change
                 ] [ 0x80 mask? ] bi
             ] loop
-        ] when
+        ] when 2array
+    ] with-variable ;
+
+: read-be-length ( -- length )
+    read1* dup 0x80 mask? [
+        7 bits [
+            read1*
+            [ [ 1 + 7 shift ] [ 7 bits ] bi* bitor ]
+            [ 0x80 mask? ] bi
+        ] loop
+    ] when ;
+
+: read-le-length ( -- length )
+    read1* dup 0x80 mask? [
+        7 bits [
+            read1*
+            [ 7 bits 7 shift bitor ]
+            [ 0x80 mask? ] bi
+        ] loop
+    ] when ;
+
+DEFER: git-object-from-pack
+
+TUPLE: insert bytes ;
+CONSTRUCTOR: <insert> insert ( bytes -- insert ) ;
+TUPLE: copy offset size ;
+CONSTRUCTOR: <copy> copy ( offset size -- copy ) ;
+
+: parse-delta ( -- delta/f )
+    read1 [
+        dup 0x80 mask? not [
+            7 bits read <insert>
+        ] [
+            [ 0 0 ] dip
+
+            dup 0x01 mask? [
+                [ read1* bitor ] 2dip
+            ] when
+
+            dup 0x02 mask? [
+                [ read1* 8 shift bitor ] 2dip
+            ] when
+
+            dup 0x04 mask? [
+                [ read1* 16 shift bitor ] 2dip
+            ] when
+
+            dup 0x08 mask? [
+                [ read1* 24 shift bitor ] 2dip
+            ] when
+
+            dup 0x10 mask? [
+                [ read1* bitor ] dip
+            ] when
+
+            dup 0x20 mask? [
+                [ read1* 8 shift bitor ] dip
+            ] when
+
+            dup 0x40 mask? [
+                [ read1* 16 shift bitor ] dip
+            ] when
+
+            drop [ 65536 ] when-zero
+            <copy>
+        ] if
     ] [
         f
     ] if* ;
 
-! XXX: actual length is stored in the gzip header
-! We add 256 instead of using it for now.
+: parse-deltas ( bytes -- deltas )
+    binary [
+        read-le-length
+        read-le-length
+        [ parse-delta ] loop>array 3array
+    ] with-byte-reader ;
 
-DEFER: git-object-from-pack
+ERROR: unknown-delta-operation op ;
+
+: apply-delta ( delta -- )
+    {
+        { [ dup insert? ] [ bytes>> write ] }
+        { [ dup copy? ] [ [ offset>> seek-absolute seek-input ] [ size>> read write ] bi ] }
+        [ unknown-delta-operation ]
+    } cond ;
+
+: do-deltas ( bytes delta-bytes -- bytes' )
+    [ binary ] 2dip '[
+        _ binary [
+            _ parse-deltas third [ apply-delta ] each
+        ] with-byte-reader
+    ] with-byte-writer ;
+
+
+ERROR: unsupported-packed-raw-type type ;
+
+: read-packed-raw ( -- string )
+    read-type-length first2 swap {
+        { 1 [ 256 + read uncompress ] }
+        [ unsupported-packed-raw-type ]
+    } case ;
 
 SYMBOL: initial-offset
+
+: read-offset-delta ( size -- obj )
+    [ read-be-length neg initial-offset get + ] dip 256 + read uncompress
+    [ seek-absolute seek-input read-packed-raw ] dip 2array ;
+
+: read-sha1-delta ( size -- obj )
+    [ 20 read hex-string git-object-from-pack ] dip read uncompress 2array ;
+
+! XXX: actual length is stored in the gzip header
+! We add 256 instead of using it for now.
 : read-packed ( -- obj/f )
     tell-input initial-offset [
-        read-type-length [
-            first2 swap {
-                { 1 [ 256 + read uncompress parse-object ] }
-                { 6 [ read-length neg initial-offset get + seek-absolute seek-input drop read-packed ] } ! OBJ_OFS_DELTA
-                { 7 [ drop B 20 read hex-string git-object-from-pack ] }
-                [ number>string "unknown packed type: " prepend throw ]
-            } case
-        ] [
-            f
-        ] if*
+        read-type-length first2 swap {
+            { 1 [ 256 + read uncompress parse-object ] }
+            { 6 [ read-offset-delta first2 do-deltas parse-object-bytes>assoc ] }
+            ! { 7 [ B read-sha1-delta ] }
+            [ number>string "unknown packed type: " prepend throw ]
+        } case
     ] with-variable ;
 
 : parse-packed-object ( sha1 offset -- obj )
@@ -313,7 +419,6 @@ SYMBOL: initial-offset
 
 ! http://stackoverflow.com/questions/18010820/git-the-meaning-of-object-size-returned-by-git-verify-pack
 TUPLE: pack magic version count objects sha1 ;
-! TUPLE: packed-object sha1 flags offset ;
 : parse-pack ( path -- pack )
     binary [
         input-stream [ <peek-stream> ] change
@@ -397,11 +502,22 @@ ERROR: repeated-parent-hash hash ;
     ] with-variable ;
 
 (*
+
+CONSTANT: OBJ_COMMIT 1
+CONSTANT: OBJ_TREE 2
+CONSTANT: OBJ_BLOB 3
+CONSTANT: OBJ_TAG 4
+CONSTANT: OBJ_OFS_DELTA 6
+CONSTANT: OBJ_REF_DELTA 7
+
 "/Users/erg/factor" set-current-directory
 "3dff14e2f3d0c8db662a8c6aeb5dbd427f4258eb" git-read-pack
 
 "/Users/erg/factor" set-current-directory
 git-log
+
+"/Users/erg/factor" set-current-directory
+"401597a387add5b52111d1dd954d6250ee2b2688" git-object-from-pack
 
 git verify-pack -v .git/objects/pack/pack-816d07912ac9f9b463f89b7e663298e3c8fedda5.pack | grep a6e0867b
 a6e0867b2222f3b0976e9aac6539fe8f12a552e2 commit 51 63 12938 1 8000d6670e1abdbaeebc4452c6cccbec68069ca1
@@ -412,4 +528,11 @@ http://stackoverflow.com/questions/9478023/is-the-git-binary-diff-algorithm-delt
 
 http://stackoverflow.com/questions/801577/how-to-recover-git-objects-damaged-by-hard-disk-failure
 git ls-tree
+
+! eh
+http://schacon.github.io/git/technical/pack-format.txt
+https://schacon.github.io/gitbook/7_the_packfile.html
+
+! most useful doc:
+http://git.rsbx.net/Documents/Git_Data_Formats.txt
 *)
