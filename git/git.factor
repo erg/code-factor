@@ -7,9 +7,7 @@ io.directories io.directories.search io.encodings.binary
 io.encodings.string io.encodings.utf8 io.files io.files.info
 io.pathnames io.streams.byte-array io.streams.peek kernel math
 math.bitwise math.parser math.statistics memoize namespaces
-nested-comments prettyprint sequences sequences.extras
-sequences.generalizations splitting strings threads
-tools.hexdump ;
+random sequences sequences.extras splitting strings ;
 IN: git
 
 ERROR: byte-expected offset ;
