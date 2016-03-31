@@ -139,7 +139,24 @@ ERROR: subseq-expected-but-got-eof n string expected ;
 
 ! (( )) [[ ]] {{ }}
 ERROR: long-opening-mismatch tag open n string ch ;
-MACRO:: read-long ( open-ch openstr2 openstr1 closestr1 closestr2 target-literal -- quot )
+
+: matching-char ( ch -- ch' )
+    H{
+        { CHAR: ( CHAR: ) }
+        { CHAR: [ CHAR: ] }
+        { CHAR: { CHAR: } }
+    } ?at drop ;
+
+: setup-long-macro ( ch -- openstr2 openstr1 closestr1 closestr2 )
+    dup matching-char {
+        [ drop 2 swap <string> ]
+        [ drop 1string ]
+        [ nip 1string ]
+        [ nip 2 swap <string> ]
+    } 2cleave ;
+
+MACRO:: read-long ( open-ch target-literal -- quot )
+    open-ch setup-long-macro :> ( openstr2 openstr1 closestr1 closestr2 )
     [| n string tag ch |
         ch {
             { CHAR: = [
@@ -163,13 +180,13 @@ MACRO:: read-long ( open-ch openstr2 openstr1 closestr1 closestr2 target-literal
      ] ;
 
 : read-long-paren ( n string tag ch -- n string seq )
-    CHAR: ( "((" "(" ")" "))" \ double-paren-literal read-long ;
+    CHAR: (  \ double-paren-literal read-long ;
 
 : read-long-bracket ( n string tag ch -- n string seq )
-    CHAR: [ "[[" "[" "]" "]]" \ double-bracket-literal read-long ;
+    CHAR: [ \ double-bracket-literal read-long ;
 
 : read-long-brace ( n string tag ch -- n string seq )
-    CHAR: { "{{" "{" "}" "}}" \ double-brace-literal read-long ;
+    CHAR: { \ double-brace-literal read-long ;
 
 DEFER: lex
 
