@@ -137,8 +137,6 @@ ERROR: subseq-expected-but-got-eof n string expected ;
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip
     swap [ + ] dip <slice> ;
 
-! (( )) [[ ]] {{ }}
-ERROR: long-opening-mismatch tag open n string ch ;
 
 : matching-char ( ch -- ch' )
     H{
@@ -155,6 +153,8 @@ ERROR: long-opening-mismatch tag open n string ch ;
         [ nip 2 swap <string> ]
     } 2cleave ;
 
+! (( )) [[ ]] {{ }}
+ERROR: long-opening-mismatch tag open n string ch ;
 MACRO:: read-long ( open-ch target-literal -- quot )
     open-ch setup-long-macro :> ( openstr2 openstr1 closestr1 closestr2 )
     [| n string tag ch |
@@ -210,7 +210,6 @@ ERROR: lex-expected-but-got-eof n string expected ;
         lex-expected-but-got-eof
     ] if ;
 
-
 : lex-until ( n string token -- n/f string obj )
     lex-until' drop ; inline
 
@@ -219,23 +218,30 @@ ERROR: unexpected-eof n string expected ;
 : nth-check-eof ( n string ch -- nth )
     2over ?nth [ 2nip nip ] [ unexpected-eof ] if* ;
 
-: read-bracket ( n string last -- n' string seq )
-    2over "]" nth-check-eof {
-        { [ dup "=[" member? ] [ read-long-bracket ] } ! double bracket, read [==[foo]==]
-        [ drop [ "]" lex-until' ] dip -1 modify-to bracket-literal make-literal ] ! bracket[ word
-    } cond ;
+: setup-single-macro ( ch -- openstreq closestr1 )
+    dup matching-char {
+        [ drop "=" swap prefix ]
+        [ nip 1string ]
+    } 2cleave ;
 
-: read-brace ( n string seq -- n' string seq )
-    2over "}" nth-check-eof {
-        { [ dup "={" member? ] [ read-long-brace ] } ! double brace, read {=={foo}==}
-        [ drop [ "}" lex-until' ] dip -1 modify-to brace-literal make-literal ] ! brace{ word
-    } cond ;
+MACRO:: read-matching ( ch long-version target-literal -- quot )
+    ch setup-single-macro :> ( openstreq closestr1 )
+    [| n string seq |
+        n string seq
+        2over closestr1 nth-check-eof {
+            { [ dup openstreq member? ] [ long-version execute( n string tag ch -- n string seq ) ] }
+            [ drop [ closestr1 lex-until' ] dip -1 modify-to target-literal make-literal ]
+        } cond
+    ] ;
 
 : read-paren ( n string seq -- n' string seq )
-    2over ")" nth-check-eof {
-        { [ dup "=(" member? ] [ read-long-paren ] } ! double paren, read (==(foo)==)
-        [ drop [ ")" lex-until' ] dip -1 modify-to paren-literal make-literal ] ! paren( word
-    } cond ;
+    CHAR: ( \ read-long-paren \ paren-literal read-matching ;
+
+: read-brace ( n string seq -- n' string seq )
+    CHAR: { \ read-long-brace \ brace-literal read-matching ;
+
+: read-bracket ( n string seq -- n' string seq )
+    CHAR: [ \ read-long-bracket \ bracket-literal read-matching ;
 
 : read-backtick ( n string opening -- n' string obj )
     [ take-until-whitespace drop ] dip
