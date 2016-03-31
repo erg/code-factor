@@ -137,72 +137,39 @@ ERROR: subseq-expected-but-got-eof n string expected ;
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip
     swap [ + ] dip <slice> ;
 
-! [ ] [[ ]] [=[ ]=]
-ERROR: long-bracket-opening-mismatch tag n string ch ;
-:: read-long-bracket ( n string tag ch -- n string seq )
-    ch {
-        { CHAR: = [
-            n string "[" take-including-separator :> (  n' string' tag2 ch )
-            ch CHAR: [ = [ tag n string ch long-bracket-opening-mismatch ]  unless
-            tag2 length 1 - CHAR: = <string> "]" "]" surround :> needle
+! (( )) [[ ]] {{ }}
+ERROR: long-opening-mismatch tag open n string ch ;
+MACRO:: read-long ( open-ch openstr2 openstr1 closestr1 closestr2 target-literal -- quot )
+    [| n string tag ch |
+        ch {
+            { CHAR: = [
+                n string openstr1 take-including-separator :> (  n' string' tag2 ch )
+                ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ]  unless
+                tag2 length 1 - CHAR: = <string> closestr1 closestr1 surround :> needle
 
-            n' string' needle multiline-string-until' :> ( n'' string'' inside end )
-            n'' string
-            inside end tag -1 modify-to double-bracket-literal make-literal
-        ] }
-        { CHAR: [ [
-            n 1 + string "]]" multiline-string-until' :> ( n' string' inside end )
-            n' string
-            inside  end
-            tag -1 modify-to
-            double-bracket-literal make-literal
-        ] }
-        [ [ tag n string ] dip long-bracket-opening-mismatch ]
-    } case ;
+                n' string' needle multiline-string-until' :> ( n'' string'' inside end )
+                n'' string
+                inside end tag -1 modify-to target-literal make-literal
+            ] }
+            { open-ch [
+                n 1 + string closestr2 multiline-string-until' :> ( n' string' inside end )
+                n' string
+                inside  end
+                tag -1 modify-to
+                target-literal make-literal
+            ] }
+            [ [ tag openstr2 n string ] dip long-opening-mismatch ]
+        } case
+     ] ;
 
-! {{ }}
-ERROR: long-brace-opening-mismatch tag n string ch ;
-:: read-long-brace ( n string tag ch -- n string seq )
-    ch {
-        { CHAR: = [
-            n string "{" take-including-separator :> ( n' string' tag2 ch )
-                ch CHAR: { = [ tag n string ch long-brace-opening-mismatch ]  unless
-            tag2 length 1 - CHAR: = <string> "}" "}" surround :> needle
+: read-long-paren ( n string tag ch -- n string seq )
+    CHAR: ( "((" "(" ")" "))" \ double-paren-literal read-long ;
 
-            n' string' needle multiline-string-until' :> ( n'' string'' inside end )
-            n'' string
-            inside  end tag -1 modify-to  double-brace-literal make-literal
-        ] }
-        { CHAR: { [
-            n 1 + string "}}" multiline-string-until' :> ( n' string' inside end )
-            n' string
-            inside  end tag -1 modify-to   double-brace-literal make-literal
-        ] }
-    } case ;
+: read-long-bracket ( n string tag ch -- n string seq )
+    CHAR: [ "[[" "[" "]" "]]" \ double-bracket-literal read-long ;
 
-! (( ))
-ERROR: long-paren-opening-mismatch tag n string ch ;
-:: read-long-paren ( n string tag ch -- n string seq )
-    ch {
-        { CHAR: = [
-            n string "(" take-including-separator :> (  n' string' tag2 ch )
-            ch CHAR: ( = [ tag n string ch long-paren-opening-mismatch ]  unless
-            tag2 length 1 - CHAR: = <string> ")" ")" surround :> needle
-
-            n' string' needle multiline-string-until' :> ( n'' string'' inside end )
-            n'' string
-            inside end tag -1 modify-to double-paren-literal make-literal
-        ] }
-        { CHAR: ( [
-            n 1 + string "))" multiline-string-until' :> ( n' string' inside end )
-            n' string
-            inside  end
-            tag -1 modify-to
-            double-paren-literal make-literal
-        ] }
-        [ [ tag n string ] dip long-paren-opening-mismatch ]
-    } case ;
-
+: read-long-brace ( n string tag ch -- n string seq )
+    CHAR: { "{{" "{" "}" "}}" \ double-brace-literal read-long ;
 
 DEFER: lex
 
