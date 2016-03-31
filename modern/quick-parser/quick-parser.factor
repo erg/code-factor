@@ -6,8 +6,8 @@ combinators.smart fry generalizations hashtables io
 io.encodings.utf8 io.files io.streams.string kernel lexer locals
 macros make math modern.paths multiline namespaces prettyprint
 sequences sequences.deep sequences.extras inspector
-sequences.generalizations sets shuffle strings unicode.case
-unicode.categories vectors vocabs.loader words splitting ;
+sequences.generalizations sets shuffle strings unicode
+vectors vocabs.loader words splitting ;
 QUALIFIED: parser
 QUALIFIED: lexer
 FROM: assocs => change-at ;

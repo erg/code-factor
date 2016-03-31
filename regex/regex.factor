@@ -3,8 +3,7 @@
 USING: accessors arrays assocs combinators
 combinators.short-circuit constructors fry interval-maps kernel
 locals make math math.parser memoize namespaces regexp.classes
-sequences sets splitting strings unicode.case
-unicode.categories unicode.data unicode.script.private ;
+sequences sets splitting strings unicode unicode.script unicode.data ;
 IN: regex
 
 TUPLE: character-parser string { n integer initial: 0 } ;

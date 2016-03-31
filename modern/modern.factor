@@ -5,7 +5,7 @@ combinators.short-circuit combinators.smart constructors
 continuations effects fry hashtables io.encodings.utf8 io.files
 kernel lexer locals make math math.parser modern.paths multiline
 namespaces sequences sequences.extras shuffle splitting strings
-unicode.categories ;
+unicode ;
 IN: modern
 
 TUPLE: lexed underlying ;
