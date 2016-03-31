@@ -77,7 +77,7 @@ CONSTRUCTOR: <index-entry> index-entry ( ctime mtime dev ino mode uid gid size s
     4 read be>
     4 read be>
     4 read be>
-    20 read hex-string
+    20 read bytes>hex-string
     2 read be> { 0 } read-until drop [ utf8 decode ] [ length ] bi
     7 + 8 mod dup zero? [ 8 swap - ] unless read drop
     <index-entry> ;
@@ -96,7 +96,7 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
             { 2 [ [ read-index-entry-v2 ] replicate ] }
             [ unhandled-git-version ]
         } case
-        20 read hex-string
+        20 read bytes>hex-string
         <git-index>
     ] with-file-reader ;
 
@@ -113,7 +113,7 @@ ERROR: unhandled-git-index-trailing-bytes bytes ;
 
 : changed-index-by-sha1 ( -- seq )
     git-index-contents entries>>
-    [ [ sha1>> ] [ name>> path>git-object hex-string ] bi = not ] filter ;
+    [ [ sha1>> ] [ name>> path>git-object bytes>hex-string ] bi = not ] filter ;
 
 : changed-index-by-mtime ( -- seq )
     git-index-contents entries>>
@@ -262,11 +262,11 @@ CONSTRUCTOR: <idx> idx ( version table triples packfile-sha1 idx-sha1 -- obj ) ;
     4 read be>
     256 4 * read 4 group [ be> ] map
     dup last
-    [ [ 20 read hex-string ] replicate ]
+    [ [ 20 read bytes>hex-string ] replicate ]
     [ [ 4 read ] replicate ]
     [ [ 4 read be> ] replicate ] tri 3array flip
-    20 read hex-string
-    20 read hex-string <idx> ;
+    20 read bytes>hex-string
+    20 read bytes>hex-string <idx> ;
 
 : parse-idx ( path -- idx )
     binary [
@@ -399,7 +399,7 @@ SYMBOL: initial-offset
     [ seek-absolute seek-input read-packed-raw ] dip 2array ;
 
 : read-sha1-delta ( size -- obj )
-    [ 20 read hex-string git-object-from-pack ] dip read uncompress 2array ;
+    [ 20 read bytes>hex-string git-object-from-pack ] dip read uncompress 2array ;
 
 ! XXX: actual length is stored in the gzip header
 ! We add 256 instead of using it for now.

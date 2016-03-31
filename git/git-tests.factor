@@ -1,8 +1,7 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: fry git io io.directories io.encodings.utf8
-io.files.unique io.launcher kernel namespaces sequences
-tools.test ;
+USING: fry git io io.directories io.encodings.utf8 io.files.temp
+io.files.unique io.launcher kernel sequences tools.test ;
 IN: git.tests
 
 : run-process-stdout ( process -- string )
@@ -10,11 +9,11 @@ IN: git.tests
 
 : with-empty-test-git-repo ( quot -- )
     '[
-        current-temporary-directory get [
+        [
             { "git" "init" } run-process drop
             @
-        ] with-directory
-    ] with-unique-directory drop ; inline
+        ] cleanup-unique-directory
+    ] with-temp-directory ; inline
 
 : with-zero-byte-file-repo ( quot -- )
     '[
@@ -31,7 +30,7 @@ IN: git.tests
 
 { } [
     [
-        ! current-temporary-directory get t recursive-directory-files
+        ! "." t recursive-directory-files
         git-log [ commit. ] each
     ] with-zero-byte-file-repo
 ] unit-test
