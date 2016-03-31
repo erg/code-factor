@@ -180,7 +180,7 @@ MACRO:: read-long ( open-ch target-literal -- quot )
      ] ;
 
 : read-long-paren ( n string tag ch -- n string seq )
-    CHAR: (  \ double-paren-literal read-long ;
+    CHAR: ( \ double-paren-literal read-long ;
 
 : read-long-bracket ( n string tag ch -- n string seq )
     CHAR: [ \ double-bracket-literal read-long ;
