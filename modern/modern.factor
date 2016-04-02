@@ -37,6 +37,13 @@ TUPLE: double-bracket-comment < double-comment ;
 TUPLE: double-brace-comment < double-comment ;
 TUPLE: double-paren-comment < double-comment ;
 
+ERROR: whitespace-expected-after n string ch ;
+ERROR: subseq-expected-but-got-eof n string expected ;
+ERROR: long-opening-mismatch tag open n string ch ;
+ERROR: string-expected-got-eof n string ;
+ERROR: unexpected-eof n string expected ;
+ERROR: expected-more-tokens n string expected ;
+
 :: make-literal ( payload end tag literal-class -- literal )
     literal-class new
         tag >>tag
@@ -48,56 +55,45 @@ TUPLE: double-paren-comment < double-comment ;
         swap >>text ; inline
         ! swap >>underlying ; inline
 
-: ?<slice> ( m n/f string -- slice )
-    over [ nip [ length ] [ ] bi ] unless <slice> ; inline
-
 ! Allow eof
-: take-next-char ( n/f string -- n/f string ch/f )
+: next-char-from ( n/f string -- n'/f string ch/f )
     over [
         2dup ?nth [ [ 1 + ] 2dip ] [ f ] if*
     ] [
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
-: skip-blank ( n string -- n' string )
+: skip-blank-from ( n string -- n' string )
     [ [ blank? not ] find-from drop ] keep ; inline
 
-: skip-til-eol ( n string -- n' string )
+: skip-til-eol-from ( n string -- n' string )
     [ [ "\r\n" member? ] find-from drop ] keep ; inline
 
-:: take-til-eol ( n string -- n' string slice/f ch/f )
+:: slice-til-eol-from ( n string -- n' string slice/f ch/f )
     n string '[ "\r\n" member? ] find-from :> ( n' ch )
     n' string
     n n' string ?<slice>
     ch ; inline
 
-: append-slice ( begin end -- slice )
-    [ drop from>> ]
-    [ nip [ to>> ] [ seq>> ] bi <slice> ] 2bi ; inline
-
-: prepend-slice ( end begin -- slice )
-    swap append-slice ; inline
-
 ! Don't include the whitespace in the slice
-:: take-until-whitespace ( n string -- n' string slice/f ch/f )
+:: slice-until-whitespace ( n string -- n' string slice/f ch/f )
     n string '[ "\s\r\n" member? ] find-from :> ( n' ch )
     n' string
     n n' string ?<slice>
     ch ; inline
 
-:: take-including-separator ( n string tokens -- n' string slice/f ch/f )
+:: slice-until-separator-inclusive ( n string tokens -- n' string slice/f ch/f )
     n string '[ tokens member? ] find-from [ dup [ 1 + ] when ] dip  :> ( n' ch )
     n' string
     n n' string ?<slice>
     ch ; inline
 
-:: take-excluding-separator ( n string tokens -- n' string slice/f ch/f )
-    n string '[ tokens member? ] find-from :> ( n' ch )
-    n' string
-    n n' string ?<slice>
-    ch ; inline
+: slice-until-separator-exclusive ( n string tokens -- n' string slice/f ch/f )
+    slice-until-separator-inclusive dup [
+        [ [ 1 - ] change-to ] dip
+    ] when ;
 
-:: take-until-either ( n string tokens -- n' string slice/f ch )
+:: slice-until-either ( n string tokens -- n' string slice/f ch )
     n string '[ tokens member? ] find-from
     dup "\s\r\n" member? [
         :> ( n' ch )
@@ -111,38 +107,31 @@ TUPLE: double-paren-comment < double-comment ;
         ch
     ] if ; inline
 
-: complete-lex ( n string token --  n' string token' )
-    [ take-until-whitespace drop ] dip prepend-slice ;
-
-ERROR: whitespace-expected-after n string ch ;
-: skip-space-after ( n string -- n' string )
-    take-next-char [
+: skip-one-space-after ( n string -- n' string )
+    next-char-from [
         dup blank?
         [ drop ]
         [ whitespace-expected-after ] if
     ] when* ;
 
-ERROR: subseq-expected-but-got-eof n string expected ;
-:: multiline-string-until' ( n string multi --  n' string inside end )
-    multi string n start* :> n'
-    n' [ n string multi subseq-expected-but-got-eof ] unless
-    n' multi length +  string
+:: slice-until-string ( n string search --  n' string payload end-string )
+    search string n start* :> n'
+    n' [ n string search subseq-expected-but-got-eof ] unless
+    n' search length +  string
     n n' string ?<slice>
-    n' dup multi length + string ?<slice> ;
-
-: multiline-string-until ( n string multi --  n' string inside )
-    multiline-string-until' drop ; inline
+    n' dup search length + string ?<slice> ;
 
 : modify-to ( slice n -- slice' )
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip
     swap [ + ] dip <slice> ;
 
-
+<<
 : matching-char ( ch -- ch' )
     H{
         { CHAR: ( CHAR: ) }
         { CHAR: [ CHAR: ] }
         { CHAR: { CHAR: } }
+        ! { CHAR: < CHAR: > }
     } ?at drop ;
 
 : setup-long-macro ( ch -- openstr2 openstr1 closestr1 closestr2 )
@@ -152,24 +141,24 @@ ERROR: subseq-expected-but-got-eof n string expected ;
         [ nip 1string ]
         [ nip 2 swap <string> ]
     } 2cleave ;
+>>
 
 ! (( )) [[ ]] {{ }}
-ERROR: long-opening-mismatch tag open n string ch ;
 MACRO:: read-long ( open-ch target-literal -- quot )
     open-ch setup-long-macro :> ( openstr2 openstr1 closestr1 closestr2 )
     [| n string tag ch |
         ch {
             { CHAR: = [
-                n string openstr1 take-including-separator :> (  n' string' tag2 ch )
+                n string openstr1 slice-until-separator-inclusive :> (  n' string' tag2 ch )
                 ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ]  unless
                 tag2 length 1 - CHAR: = <string> closestr1 closestr1 surround :> needle
 
-                n' string' needle multiline-string-until' :> ( n'' string'' inside end )
+                n' string' needle slice-until-string :> ( n'' string'' inside end )
                 n'' string
                 inside end tag -1 modify-to target-literal make-literal
             ] }
             { open-ch [
-                n 1 + string closestr2 multiline-string-until' :> ( n' string' inside end )
+                n 1 + string closestr2 slice-until-string :> ( n' string' inside end )
                 n' string
                 inside  end
                 tag -1 modify-to
@@ -213,16 +202,17 @@ ERROR: lex-expected-but-got-eof n string expected ;
 : lex-until ( n string token -- n/f string obj )
     lex-until' drop ; inline
 
-ERROR: unexpected-eof n string expected ;
 
 : nth-check-eof ( n string ch -- nth )
     2over ?nth [ 2nip nip ] [ unexpected-eof ] if* ;
 
+<<
 : setup-single-macro ( ch -- openstreq closestr1 )
     dup matching-char {
         [ drop "=" swap prefix ]
         [ nip 1string ]
     } 2cleave ;
+>>
 
 MACRO:: read-matching ( ch long-version target-literal -- quot )
     ch setup-single-macro :> ( openstreq closestr1 )
@@ -244,20 +234,19 @@ MACRO:: read-matching ( ch long-version target-literal -- quot )
     CHAR: [ \ read-long-bracket \ bracket-literal read-matching ;
 
 : read-backtick ( n string opening -- n' string obj )
-    [ take-until-whitespace drop ] dip
+    [ slice-until-whitespace drop ] dip
     backtick-literal new
         swap but-last-slice >>tag
         swap >>payload
         dup [ tag>> from>> ]
             [ payload>> [ to>> ] [ seq>> ] bi ] bi <slice> >>underlying ;
 
-ERROR: string-expected-got-eof n string ;
 : read-string' ( n string -- n' string )
     over [
-        { CHAR: \ CHAR: " } take-including-separator {
+        { CHAR: \ CHAR: " } slice-until-separator-inclusive {
             { f [ drop ] }
             { CHAR: " [ drop ] }
-            { CHAR: \ [ take-next-char 2drop read-string' ] }
+            { CHAR: \ [ next-char-from 2drop read-string' ] }
         } case
     ] [
         string-expected-got-eof
@@ -276,18 +265,21 @@ ERROR: string-expected-got-eof n string ;
         1 modify-to
         [ 1 + ] 2dip 2over ?nth read-long-bracket
     ] [
-        drop take-til-eol drop eol-comment make-comment
+        drop slice-til-eol-from drop eol-comment make-comment
     ] if ;
+
+: complete-token ( n string slice --  n' string slice' )
+    [ slice-until-whitespace drop ] dip merge-slices ;
 
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
     dup { [ "!" sequence= ] [ "#!" sequence= ] } 1||
-    [ take-comment ] [ complete-lex ] if ;
+    [ take-comment ] [ complete-token ] if ;
 
 ERROR: backslash-unexpected-eof slice n string ;
 : read-backslash' ( n string ch -- n' string obj )
-    [ skip-space-after skip-blank ] dip ! skip at least one space, then skip all blanks after that
-    [ take-until-whitespace drop ] dip over length 0 > [
+    [ skip-one-space-after skip-blank-from ] dip ! skip at least one space, then skip all blanks after that
+    [ slice-until-whitespace drop ] dip over length 0 > [
         backslash-literal new
             swap >>payload
             swap >>tag
@@ -299,11 +291,11 @@ ERROR: backslash-unexpected-eof slice n string ;
     dup "\\" head? [
         read-backslash'
     ] [
-        complete-lex
+        complete-token
     ] if ;
 
 : read-colon ( ch n string -- n' string obj )
-    complete-lex
+    complete-token
     colon-lexed new
         swap >>underlying ;
 
@@ -315,7 +307,7 @@ ERROR: backslash-unexpected-eof slice n string ;
 
 ! If we got more than 1 char, we got a real token, return it.
 ! 1 char or fewer, we got a whitespace, try token again.
-: read-token-whitespace ( n string tok -- n string tok )
+: read-token-or-whitespace ( n string tok -- n string tok )
     dup length 0 = [
         drop [ 1 + ] dip lex
     ] when ;
@@ -324,7 +316,7 @@ ERROR: backslash-unexpected-eof slice n string ;
     over [
         ! XXX: order matteres, specifically comments vs #[[ ]]
         ! seq n string ch
-        "!`()[]{}\"\s\r\n\\:" take-until-either {
+        "!`()[]{}\"\s\r\n\\:" slice-until-either {
             { f [ f like ] }
             { CHAR: ! [ read-exclamation ] }
             { CHAR: ` [ read-backtick ] }
@@ -337,9 +329,9 @@ ERROR: backslash-unexpected-eof slice n string ;
             { CHAR: ) [ read-closing ] }
             { CHAR: \ [ read-backslash ] }
             { CHAR: : [ read-colon ] }
-            { CHAR: \s [ read-token-whitespace ] }
-            { CHAR: \r [ read-token-whitespace ] }
-            { CHAR: \n [ read-token-whitespace ] }
+            { CHAR: \s [ read-token-or-whitespace ] }
+            { CHAR: \r [ read-token-or-whitespace ] }
+            { CHAR: \n [ read-token-or-whitespace ] }
             [ drop ] ! <lexed> ]
         } case
     ] [
@@ -359,7 +351,7 @@ TUPLE: new-class name ;
 TUPLE: existing-word name ;
 TUPLE: existing-class name ;
 
-: dip-inc ( n seq -- n' seq )
+: dip-inc ( n/f seq -- n'/f seq )
     [ dup [ 1 + ] when ] dip ; inline
 
 : token ( n seq -- n' seq token/f )
@@ -390,13 +382,12 @@ DEFER: tokens-until
 : expect-body ( n seq -- n seq array ) ";" [ array? ] expect-tokens-until ;
 
 : drop-token ( n seq -- n' seq ) token drop ;
-: new-word ( n seq -- slice n seq ) [ slice? ] expect-token -rot ;
-: existing-word ( n seq -- slice n seq ) [ slice? ] expect-token -rot ;
-: stack-effect ( n seq -- slice n seq ) [ paren-literal? ] expect-token -rot ;
-: body ( n seq -- array n seq ) ";" [ array? ] expect-tokens-until -rot ;
+: new-word ( n seq -- slice n' seq ) [ slice? ] expect-token -rot ;
+: existing-word ( n seq -- slice n' seq ) [ slice? ] expect-token -rot ;
+: stack-effect ( n seq -- slice n' seq ) [ paren-literal? ] expect-token -rot ;
+: body ( n seq -- array n' seq ) ";" [ array? ] expect-tokens-until -rot ;
 
-ERROR: expected-more-tokens n string expected ;    
-: tokens-until ( n seq token -- n seq out last )
+: tokens-until ( n seq token -- n' seq out last )
     pick [
         3dup '[
             [
