@@ -13,7 +13,6 @@ TUPLE: lexed underlying ;
 : <lexed> ( slice -- lexed )
     lexed new
         swap >>underlying ; inline
-TUPLE: colon-lexed < lexed ;
 
 TUPLE: literal < lexed tag payload ;
 
@@ -294,11 +293,6 @@ ERROR: backslash-unexpected-eof slice n string ;
         complete-token
     ] if ;
 
-: read-colon ( ch n string -- n' string obj )
-    complete-token
-    colon-lexed new
-        swap >>underlying ;
-
 : read-closing ( n string tok -- n string tok )
     dup length 1 = [
     ] [
@@ -328,7 +322,6 @@ ERROR: backslash-unexpected-eof slice n string ;
             { CHAR: ( [ read-paren ] }
             { CHAR: ) [ read-closing ] }
             { CHAR: \ [ read-backslash ] }
-            { CHAR: : [ read-colon ] }
             { CHAR: \s [ read-token-or-whitespace ] }
             { CHAR: \r [ read-token-or-whitespace ] }
             { CHAR: \n [ read-token-or-whitespace ] }
@@ -480,10 +473,6 @@ M: slice transform-literal
 M: brace-literal transform-literal
     [ ] [ tag>> >string ] bi
     braces get ?at [ new swap >>obj ] [ unknown-syntax ] if ;
-
-M: colon-lexed transform-literal
-    [ ] [ underlying>> ":" ?tail drop >string ] bi
-    colons get ?at [ new swap >>obj ] [ unknown-syntax ] if ;
 
 M: paren-literal transform-literal
     payload>>
