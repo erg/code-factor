@@ -74,11 +74,11 @@ IN: modern.tests
 ! ] unit-test
 
 
-{ { "1" "2" "+" } }
-[ "[1 2 +]" string>literals first payload>> [ >string ] map ] unit-test
+! { { "1" "2" "+" } }
+! [ "[1 2 +]" string>literals first payload>> [ >string ] map ] unit-test
 
-{ { "1" "2" "+" } }
-[ "{1 2 +}" string>literals first payload>> [ >string ] map ] unit-test
+! { { "1" "2" "+" } }
+! [ "{1 2 +}" string>literals first payload>> [ >string ] map ] unit-test
 
-{ { "1" "2" "+" } }
-[ "(1 2 +)" string>literals first payload>> [ >string ] map ] unit-test
+! { { "1" "2" "+" } }
+! [ "(1 2 +)" string>literals first payload>> [ >string ] map ] unit-test
