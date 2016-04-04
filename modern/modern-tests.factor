@@ -57,7 +57,7 @@ IN: modern.tests
 { 1 } [ "\\ \\" string>literals length ] unit-test
 { 1 } [ " \\   abcd " string>literals length ] unit-test
 
-{ "omg" } [ "!omg" string>literals first text>> >string ] unit-test
+{ "omg" } [ "!omg" string>literals first payload>> >string ] unit-test
 
 ! Comment character should be #, and should not be allowed in word names
 ! For now, we have exclamation as comment character and words
