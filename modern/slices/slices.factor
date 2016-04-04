@@ -12,9 +12,9 @@ IN: modern.slices
         { CHAR: < CHAR: > }
     } ?at drop ;
 
-
-: nth-check-eof ( n string ch -- nth )
-    2over ?nth [ 2nip nip ] [ unexpected-eof ] if* ;
+ERROR: unexpected-end n string ;
+: nth-check-eof ( n string -- nth )
+    2dup ?nth [ 2nip ] [ unexpected-end ] if* ;
 
 ! Allow eof
 : next-char-from ( n/f string -- n'/f string ch/f )
@@ -86,6 +86,9 @@ IN: modern.slices
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip
     swap [ + ] dip <slice> ;
 
+! { CHAR: ] [ read-closing ] }
+! { CHAR: } [ read-closing ] }
+! { CHAR: ) [ read-closing ] }
 : read-closing ( n string tok -- n string tok )
     dup length 1 = [
         -1 modify-to [ 1 - ] 2dip
