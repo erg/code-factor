@@ -24,31 +24,16 @@ ERROR: unexpected-end n string ;
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
-: iterate-step ( i n quot -- i n quot )
-    ! Apply quot to i, keep i and quot, hide n.
-    [ nip call ] 3keep ; inline
 
-: (find-integer*) ( ... i n quot: ( ... i -- ... ? ) -- ... i/f )
-    [
-        iterate-step iterate-rot
-        [ 2drop ] [ iterate-next (find-integer*) ] if
-    ] [ 2drop ] if-iterate? ; inline recursive
-
-: (find-from*) ( n seq quot quot' -- i elt )
-    [ 2dup bounds-check? ] 2dip
-    [ (find) ] 2curry
-    [ drop f ]
-    if ; inline
-
-: find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt )
-    [ (find-integer*) ] (find-from*) ; inline
-
+:: find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt ? )
+    n seq quot find-from :> ( i elt )
+    i [ i elt t ] [ seq length f f ] if ; inline
 
 : skip-blank-from ( n string -- n' string )
-    [ [ blank? not ] find-from* drop ] keep ; inline
+    [ [ blank? not ] find-from* 2drop ] keep ; inline
 
 : skip-til-eol-from ( n string -- n' string )
-    [ [ "\r\n" member? ] find-from* drop ] keep ; inline
+    [ [ "\r\n" member? ] find-from* 2drop ] keep ; inline
 
 :: slice-til-eol-from ( n string -- n' string slice/f ch/f )
     n string '[ "\r\n" member? ] find-from :> ( n' ch )
