@@ -24,10 +24,9 @@ ERROR: unexpected-end n string ;
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
-
-:: find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt ? )
-    n seq quot find-from :> ( i elt )
-    i [ i elt t ] [ seq length f f ] if ; inline
+: find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt ? )
+    [ find-from ] keep
+    pick [ drop t ] [ length -rot nip f ] if ; inline
 
 : skip-blank-from ( n string -- n' string )
     [ [ blank? not ] find-from* 2drop ] keep ; inline
