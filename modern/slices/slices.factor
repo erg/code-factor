@@ -1,7 +1,7 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors assocs fry kernel locals math modern sequences
-sequences.extras unicode ;
+USING: accessors assocs fry kernel locals math math.private
+modern sequences sequences.extras sequences.private unicode ;
 IN: modern.slices
 
 : matching-char ( ch -- ch' )
@@ -24,11 +24,31 @@ ERROR: unexpected-end n string ;
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
+: iterate-step ( i n quot -- i n quot )
+    ! Apply quot to i, keep i and quot, hide n.
+    [ nip call ] 3keep ; inline
+
+: (find-integer*) ( ... i n quot: ( ... i -- ... ? ) -- ... i/f )
+    [
+        iterate-step iterate-rot
+        [ 2drop ] [ iterate-next (find-integer*) ] if
+    ] [ 2drop ] if-iterate? ; inline recursive
+
+: (find-from*) ( n seq quot quot' -- i elt )
+    [ 2dup bounds-check? ] 2dip
+    [ (find) ] 2curry
+    [ drop f ]
+    if ; inline
+
+: find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt )
+    [ (find-integer*) ] (find-from*) ; inline
+
+
 : skip-blank-from ( n string -- n' string )
-    [ [ blank? not ] find-from drop ] keep ; inline
+    [ [ blank? not ] find-from* drop ] keep ; inline
 
 : skip-til-eol-from ( n string -- n' string )
-    [ [ "\r\n" member? ] find-from drop ] keep ; inline
+    [ [ "\r\n" member? ] find-from* drop ] keep ; inline
 
 :: slice-til-eol-from ( n string -- n' string slice/f ch/f )
     n string '[ "\r\n" member? ] find-from :> ( n' ch )

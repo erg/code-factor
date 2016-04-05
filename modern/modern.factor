@@ -17,19 +17,31 @@ TUPLE: backslash-lexer delimiter ;          ! word\ something    ! has a space a
 TUPLE: til-eol-lexer delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
 TUPLE: standalone-only-lexer delimiter ;    ! example:   ! comment   word!
 
-TUPLE: string-lexed < lexed ;
-TUPLE: matching-lexed < lexed ;
-TUPLE: backtick-lexed < lexed ;
-TUPLE: backslash-lexed < lexed ;
-TUPLE: til-eol-lexed < lexed ;
-TUPLE: standalone-only-lexed < lexed ;
-
 TUPLE: single-literal < lexed ;
 TUPLE: double-literal < lexed ;
 TUPLE: string-literal < lexed ;
 TUPLE: backtick-literal < lexed ;
 TUPLE: backslash-literal < lexed ;
 TUPLE: til-eol-literal < lexed ;
+TUPLE: standalone-only-literal < lexed ;
+
+
+: set-underlying ( obj -- obj )
+    dup [ tag>> ] [ payload>> ] bi span-slices >>underlying ; inline
+
+
+ERROR: unknown-literal ch ;
+<<
+: lookup-literal ( ch -- literal )
+    H{
+        { CHAR: [ single-literal }
+        { CHAR: { single-literal }
+        { CHAR: ( single-literal }
+        { CHAR: " string-literal }
+        { CHAR: ` backtick-literal }
+        { CHAR: \ backslash-literal }
+    } clone ?at [ unknown-literal ] unless ;
+>>
 
 ERROR: whitespace-expected-after n string ch ;
 ERROR: subseq-expected-but-got-eof n string expected ;
@@ -40,6 +52,7 @@ ERROR: expected-more-tokens n string expected ;
     new
         swap >>payload
         swap >>tag ; inline
+
 ERROR: long-opening-mismatch tag open n string ch ;
 
 ! (( )) [[ ]] {{ }}
@@ -102,12 +115,13 @@ MACRO:: read-matching ( ch -- quot: ( n string slice -- n' string slice' ) )
     ch dup matching-char {
         [ drop "=" swap prefix ]
         [ nip 1string ]
-    } 2cleave :> ( openstreq closestr1 )  ! [= ]
+        [ drop lookup-literal ]
+    } 2cleave :> ( openstreq closestr1 literal )  ! [= ]
     [| n string slice |
         n string slice
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-long ] } ! (=( or ((
-            { [ dup blank? ] [ drop [ closestr1 lex-until drop ] dip -1 modify-to swap lexed make-literal ] } ! ( foo )
+            { [ dup blank? ] [ drop [ closestr1 lex-until drop ] dip -1 modify-to swap literal make-literal ] } ! ( foo )
             [ drop [ slice-until-whitespace drop ] dip span-slices ]  ! (foo)
         } cond
     ] ;
@@ -121,7 +135,7 @@ MACRO:: read-matching ( ch -- quot: ( n string slice -- n' string slice' ) )
     backtick-literal new
         swap but-last-slice >>tag
         swap >>payload
-        dup [ tag>> ] [ payload>> ] bi span-slices >>underlying ;
+        set-underlying ;
 
 : read-string-payload ( n string -- n' string )
     over [
@@ -154,19 +168,16 @@ MACRO:: read-matching ( ch -- quot: ( n string slice -- n' string slice' ) )
     dup { [ "!" sequence= ] [ "#!" sequence= ] } 1||
     [ take-comment ] [ merge-slice-until-whitespace ] if ;
 
-ERROR: backslash-unexpected-eof slice n string ;
-: read-backslash' ( n string ch -- n' string obj )
-    [ skip-one-space-after skip-blank-from ] dip ! skip at least one space, then skip all blanks after that
-    [ slice-until-whitespace drop ] dip over length 0 > [
-        backslash-literal new
-            swap >>payload
-            swap >>tag
-     ] [
-        backslash-unexpected-eof
-     ] if ;
-
-: read-backslash ( n string ch -- n' string obj )
-    dup "\\" head? [ read-backslash' ] [ merge-slice-until-whitespace ] if ;
+ERROR: backslash-expects-whitespace slice ;
+: read-backslash ( n string slice -- n' string obj )
+    [
+        skip-one-space-after skip-blank-from
+        slice-until-whitespace drop dup empty? [ backslash-expects-whitespace ] when
+    ] dip
+    backslash-literal new
+        swap >>tag
+        swap >>payload
+        set-underlying ;
 
 ! If the slice is 0 width, we stopped on whitespace.
 ! Advance the index and read again!
@@ -220,6 +231,9 @@ SYMBOL: lexing-delimiters
 
 : string>literals ( string -- sequence )
     [ 0 ] dip [ lex ] loop>array 2nip ;
+
+
+
 
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop
