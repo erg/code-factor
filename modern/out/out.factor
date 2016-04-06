@@ -1,45 +1,31 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors io io.encodings.utf8 io.files io.streams.string
-kernel namespaces sequences sequences.extras ;
+kernel modern.slices namespaces sequences ;
 IN: modern.out
 
 SYMBOL: last-slice
 
-: slice-between ( slice1 slice2 -- slice )
-    ensure-same-underlying
-    slice-order-by-from
-    [ to>> ]
-    [ [ from>> ] [ seq>> ] bi ] bi* <slice> ;
-
-: slice-before ( slice -- slice' )
-    [ drop 0 ] [ from>> ] [ seq>> ] tri <slice> ;
-
-: write-whitespace ( obj -- )
-    last-slice get [
-        slice-between
-    ] [
-        slice-before
-    ] if* write ;
-
-GENERIC: underlying ( obj -- seq )
-M: slice underlying seq>> ;
+GENERIC: underlying ( obj -- slice )
+M: f underlying ;
+M: slice underlying ;
 M: object underlying underlying>> ;
 
-: write-underlying ( slice -- )
+: write-whitespace ( obj -- )
+    last-slice get
+    [ slice-between ] [ slice-before ] if* write ;
+
+: write-lexed ( lexed/slice -- )
+    underlying
     [ write-whitespace ]
     [ io:write ]
-    [ dup underlying [ drop ] [ throw ] if* last-slice set ] tri ;
-
-GENERIC: write-modern ( obj -- )
-M: slice write-modern write-underlying ;
-M: object write-modern underlying>> write-underlying ;
+    [ last-slice set ] tri ;
 
 : with-last-slice ( quot -- )
     [ f last-slice ] dip with-variable ; inline
 
 : write-modern-loop ( quot -- )
-    [ [ write-modern ] each nl ] with-last-slice ; inline
+    [ [ write-lexed ] each nl ] with-last-slice ; inline
 
 : write-modern-string ( seq -- string )
     [ write-modern-loop ] with-string-writer ; inline

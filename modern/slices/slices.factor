@@ -100,3 +100,12 @@ ERROR: unexpected-end n string ;
 
 : merge-slice-until-whitespace ( n string slice --  n' string slice' )
     [ slice-until-whitespace drop ] dip merge-slices ;
+
+: slice-between ( slice1 slice2 -- slice )
+    ensure-same-underlying
+    slice-order-by-from
+    [ to>> ]
+    [ [ from>> ] [ seq>> ] bi ] bi* <slice> ;
+
+: slice-before ( slice -- slice' )
+    [ drop 0 ] [ from>> ] [ seq>> ] tri <slice> ;

@@ -225,9 +225,6 @@ SYMBOL: lexing-delimiters
 : string>literals ( string -- sequence )
     [ 0 ] dip [ lex ] loop>array 2nip ;
 
-
-
-
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop
     modern-source-path utf8 file-contents string>literals ;
