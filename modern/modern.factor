@@ -4,7 +4,7 @@ USING: accessors arrays assocs assocs.extras combinators
 combinators.short-circuit continuations fry io.encodings.utf8
 io.files kernel locals make math modern.paths modern.slices
 namespaces sequences sequences.extras sorting splitting strings
-unicode ;
+unicode multiline ;
 IN: modern
 
 TUPLE: lexed rule tag payload underlying ;
@@ -40,8 +40,8 @@ ERROR: unknown-literal ch ;
 
 ERROR: whitespace-expected-after n string ch ;
 ERROR: subseq-expected-but-got-eof n string expected ;
-ERROR: string-expected-got-eof n string ;
 ERROR: expected-more-tokens n string expected ;
+ERROR: string-expected-got-eof n string ;
 
 :: make-literal ( payload last tag class -- literal )
     class new
@@ -131,7 +131,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
 : read-backtick ( n string opening -- n' string obj )
     [
         slice-until-whitespace drop
-        1 cut-slice*
+        dup
     ] dip backtick-literal make-literal ;
 
 : read-string-payload ( n string -- n' string )
@@ -148,6 +148,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
 :: read-string ( n string tag -- n' string seq )
     n string read-string-payload drop :> n'
     n' string
+    n' [ n string string-expected-got-eof ] unless
     n n' 1 - string <slice>
     n' 1 - n' string <slice>
     tag string-literal make-literal ;
@@ -166,12 +167,13 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 ERROR: backslash-expects-whitespace slice ;
 : read-backslash ( n string slice -- n' string obj )
-    [
-        skip-one-space-after skip-blank-from
-        slice-until-whitespace drop dup empty? [ backslash-expects-whitespace ] when
-        1 cut-slice*
-    ] dip
-    backslash-literal make-literal ;
+    2over peek-from blank? [
+        ! M\
+        [ skip-blank-from slice-until-whitespace drop dup ] dip backslash-literal make-literal
+    ] [
+        ! M\N
+        [ merge-slice-until-whitespace dup ] keep backslash-literal make-literal
+    ] if ;
 
 ! If the slice is 0 width, we stopped on whitespace.
 ! Advance the index and read again!
@@ -228,6 +230,9 @@ SYMBOL: lexing-delimiters
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop
     modern-source-path utf8 file-contents string>literals ;
+
+: path>literals ( path -- sequence )
+    utf8 file-contents string>literals ;
 
 : lex-core ( -- assoc )
     core-bootstrap-vocabs [ [ vocab>literals ] [ nip ] recover ] map-zip ;

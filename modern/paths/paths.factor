@@ -77,6 +77,20 @@ ERROR: not-a-source-path path ;
         "resource:core/vocabs/loader/test/a/a.factor"
         "resource:core/vocabs/loader/test/b/b.factor"
         "resource:core/vocabs/loader/test/c/c.factor"
+        ! Here down have parse errors
+        "resource:core/vocabs/loader/test/d/d.factor"
+        "resource:core/vocabs/loader/test/e/e.factor"
+        "resource:core/vocabs/loader/test/f/f.factor"
+        "resource:core/vocabs/loader/test/g/g.factor"
+        "resource:core/vocabs/loader/test/h/h.factor"
+        "resource:core/vocabs/loader/test/i/i.factor"
+        "resource:core/vocabs/loader/test/j/j.factor"
+        "resource:core/vocabs/loader/test/k/k.factor"
+        "resource:core/vocabs/loader/test/l/l.factor"
+        "resource:core/vocabs/loader/test/m/m.factor"
+        "resource:core/vocabs/loader/test/n/n.factor"
+        "resource:core/vocabs/loader/test/o/o.factor"
+        "resource:core/vocabs/loader/test/p/p.factor"
         "resource:extra/math/blas/vectors/vectors.factor" ! need .modern file
         "resource:extra/math/blas/matrices/matrices.factor" ! need .modern file
     } diff
@@ -103,7 +117,7 @@ ERROR: not-a-source-path path ;
 : all-syntax-paths ( -- seq )
     all-vocabs [ modern-syntax-path ] map filter-exists reject-some-paths ;
 
-: all-factor-files ( -- seq )
+: all-factor-paths ( -- seq )
     [
         all-syntax-paths all-source-paths all-docs-paths all-tests-paths
     ] { } append-outputs-as ;
@@ -111,10 +125,10 @@ ERROR: not-a-source-path path ;
 : vocab-names>syntax ( strings -- seq )
     [ modern-syntax-path ] map [ exists? ] filter ;
 
-: core-syntax-files ( -- seq ) core-vocabs vocab-names>syntax reject-some-paths ;
-: basis-syntax-files ( -- seq ) basis-vocabs vocab-names>syntax reject-some-paths ;
-: extra-syntax-files ( -- seq ) extra-vocabs vocab-names>syntax reject-some-paths ;
+: core-syntax-paths ( -- seq ) core-vocabs vocab-names>syntax reject-some-paths ;
+: basis-syntax-paths ( -- seq ) basis-vocabs vocab-names>syntax reject-some-paths ;
+: extra-syntax-paths ( -- seq ) extra-vocabs vocab-names>syntax reject-some-paths ;
 
-: core-source-files ( -- seq ) core-vocabs modern-source-paths reject-some-paths ;
-: basis-source-files ( -- seq ) basis-vocabs modern-source-paths reject-some-paths ;
-: extra-source-files ( -- seq ) extra-vocabs modern-source-paths reject-some-paths ;
+: core-source-paths ( -- seq ) core-vocabs modern-source-paths reject-some-paths ;
+: basis-source-paths ( -- seq ) basis-vocabs modern-source-paths reject-some-paths ;
+: extra-source-paths ( -- seq ) extra-vocabs modern-source-paths reject-some-paths ;

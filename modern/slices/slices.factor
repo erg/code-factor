@@ -16,6 +16,9 @@ ERROR: unexpected-end n string ;
 : nth-check-eof ( n string -- nth )
     2dup ?nth [ 2nip ] [ unexpected-end ] if* ;
 
+: peek-from ( n/f string -- ch )
+    over [ ?nth ] [ 2drop f ] if ;
+
 ! Allow eof
 : next-char-from ( n/f string -- n'/f string ch/f )
     over [
