@@ -1,10 +1,10 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors io io.encodings.string io.encodings.utf8
-io.files io.streams.string kernel modern modern.paths
-modern.slices namespaces sequences sets ;
+USING: accessors continuations io io.encodings.string
+io.encodings.utf8 io.files io.streams.string kernel modern
+modern.paths modern.slices namespaces prettyprint sequences sets
+strings ;
 IN: modern.out
-
 SYMBOL: last-slice
 
 GENERIC: underlying ( obj -- slice )
@@ -15,12 +15,12 @@ M: object underlying underlying>> ;
 : write-whitespace ( obj -- )
     last-slice get
     [ slice-between ] [ slice-before ] if*
-    utf8 decode io:write ;
+    >string io:write ;
 
 : write-lexed ( lexed/slice -- )
     underlying
     [ write-whitespace ]
-    [ utf8 decode io:write ]
+    [ >string io:write ]
     [ last-slice namespaces:set ] tri ;
 
 : with-last-slice ( quot -- )
@@ -38,7 +38,7 @@ M: object underlying underlying>> ;
 : rewrite-modern-path ( path -- )
     ! dup print
     [ [ path>literals ] [ ] bi write-modern-path ]
-    [ . . ] recover ;
+    [ drop . ] recover ;
 
 : rewrite-paths ( seq -- ) [ rewrite-modern-path ] each ;
 : rewrite-core ( -- ) core-source-paths rewrite-paths ;
@@ -98,17 +98,18 @@ M: object underlying underlying>> ;
         "resource:extra/cuesheet/cuesheet.factor"    ! CHAR: "
         "resource:extra/fjsc/fjsc.factor"            ! EBNF:
         "resource:extra/emojify/emojify.factor"      ! R/
-        "resource:extra/flip-text/flip-text.factor"
-        "resource:extra/ini-file/ini-file.factor"
         "resource:extra/gml/gml.factor"
         "resource:extra/metar/metar.factor"          ! R/
         "resource:extra/morse/morse.factor"
+        "resource:extra/rosetta-code/balanced-brackets/balanced-brackets.factor"
+        "resource:extra/flip-text/flip-text.factor"
+        "resource:extra/ini-file/ini-file.factor"
         "resource:extra/poker/poker.factor"
         "resource:extra/qw/qw.factor"
         "resource:extra/svg/svg.factor"
         "resource:extra/text-to-pdf/text-to-pdf.factor"
         "resource:extra/tnetstrings/tnetstrings.factor"
-        "resource:extra/trees/trees.factor"          ! tree{
+        "resource:extra/trees/trees.factor"
         "resource:extra/alien/data/map/map.factor"
         "resource:extra/arrays/shaped/shaped.factor"
         "resource:extra/bunny/outlined/outlined.factor"
@@ -122,7 +123,6 @@ M: object underlying underlying>> ;
         "resource:extra/html/parser/parser.factor"
         "resource:extra/infix/parser/parser.factor"
         "resource:extra/infix/tokenizer/tokenizer.factor"
-        "resource:extra/math/unicode/unicode.factor"
         "resource:extra/parser-combinators/simple/simple.factor"
         "resource:extra/pdf/values/values.factor"
         "resource:extra/peg/pl0/pl0.factor"
