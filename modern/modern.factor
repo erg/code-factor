@@ -153,14 +153,14 @@ MACRO:: read-matching ( ch -- quot: ( n string slice -- n' string slice' ) )
     n' string
     name [ from>> ] [ to>> 1 - ] [ seq>> ] tri <slice>
     n n' 1 - string <slice>
-    string-literal make-literal ;
+    string-literal make-literal set-underlying [ 1 modify-to ] change-underlying ;
 
 : take-comment ( n string slice -- n' string comment )
     2over ?nth CHAR: [ = [
         1 modify-to
         [ 1 + ] 2dip 2over ?nth read-long-bracket
     ] [
-        drop slice-til-eol-from drop "" swap til-eol-literal make-literal
+        [ slice-til-eol-from drop ] dip swap til-eol-literal make-literal set-underlying
     ] if ;
 
 ! Words like append! and suffix! are allowed for now.
@@ -174,10 +174,7 @@ ERROR: backslash-expects-whitespace slice ;
         skip-one-space-after skip-blank-from
         slice-until-whitespace drop dup empty? [ backslash-expects-whitespace ] when
     ] dip
-    backslash-literal new
-        swap >>tag
-        swap >>payload
-        set-underlying ;
+    backslash-literal make-literal set-underlying ;
 
 ! If the slice is 0 width, we stopped on whitespace.
 ! Advance the index and read again!
