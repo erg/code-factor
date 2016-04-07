@@ -9,19 +9,31 @@ SYMBOL: last-slice
 
 GENERIC: underlying ( obj -- slice )
 M: f underlying ;
-M: slice underlying ;
 M: object underlying underlying>> ;
+
+GENERIC: write-modern-literal ( obj -- )
+M: token-literal write-modern-literal payload>> write ;
+M: object write-modern-literal underlying write ;
+
+! M: single-literal write-modern-literal drop ;
+! M: double-literal write-modern-literal drop ;
+! M: string-literal write-modern-literal drop ;
+! M: backtick-literal write-modern-literal drop ;
+! M: backslash-literal write-modern-literal drop ;
+! M: til-eol-literal write-modern-literal drop ;
+! M: standalone-only-literal write-modern-literal drop ;
 
 : write-whitespace ( obj -- )
     last-slice get
     [ slice-between ] [ slice-before ] if*
     >string io:write ;
 
+! Swap in write-modern-literal for renaming
 : write-lexed ( lexed/slice -- )
-    underlying
-    [ write-whitespace ]
-    [ >string io:write ]
-    [ last-slice namespaces:set ] tri ;
+    [ underlying write-whitespace ]
+    [ underlying >string io:write ]
+!    [ write-modern-literal ]
+    [ underlying last-slice namespaces:set ] tri ;
 
 : with-last-slice ( quot -- )
     [ f last-slice ] dip with-variable ; inline

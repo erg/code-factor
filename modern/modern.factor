@@ -2,9 +2,9 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays assocs assocs.extras combinators
 combinators.short-circuit continuations fry io.encodings.utf8
-io.files kernel locals make math modern.paths modern.slices
-namespaces sequences sequences.extras sorting splitting strings
-unicode multiline ;
+io.files kernel locals make math modern.out modern.paths
+modern.slices multiline namespaces sequences sequences.extras
+sorting splitting strings unicode ;
 IN: modern
 
 TUPLE: lexed rule tag payload underlying ;
@@ -17,6 +17,7 @@ TUPLE: backslash-lexer delimiter ;          ! word\ something    ! has a space a
 TUPLE: til-eol-lexer delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
 TUPLE: standalone-only-lexer delimiter ;    ! example:   ! comment   word!
 
+TUPLE: token-literal < lexed ;
 TUPLE: single-literal < lexed ;
 TUPLE: double-literal < lexed ;
 TUPLE: string-literal < lexed ;
@@ -47,7 +48,8 @@ ERROR: string-expected-got-eof n string ;
     class new
         tag >>tag
         payload >>payload
-        tag last span-slices >>underlying ; inline
+        tag last [ dup token-literal? [ underlying ] when ] bi@
+        span-slices >>underlying ; inline
 
 ERROR: long-opening-mismatch tag open n string ch ;
 
@@ -91,8 +93,8 @@ ERROR: lex-expected-but-got-eof n string expected ;
         3dup '[
             [
                 lex dup , [
-                    dup slice? [
-                        _ sequence= not
+                    dup token-literal? [
+                        underlying>> _ sequence= not
                     ] [
                         drop t  ! loop again?
                     ] if
@@ -116,11 +118,10 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-long ] } ! (=( or ((
             { [ dup blank? ] [
-                drop
-                [
+                drop [
                     closestr1 lex-until  
                 ] dip literal make-literal ] } ! ( foo )
-            [ drop [ slice-until-whitespace drop ] dip span-slices ]  ! (foo)
+            [ drop [ slice-until-whitespace drop ] dip span-slices dup dup token-literal make-literal ]  ! (foo)
         } cond
     ] ;
 
@@ -163,7 +164,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
     dup { [ "!" sequence= ] [ "#!" sequence= ] } 1||
-    [ take-comment ] [ merge-slice-until-whitespace ] if ;
+    [ take-comment ] [ merge-slice-until-whitespace dup dup token-literal make-literal ] if ;
 
 ERROR: backslash-expects-whitespace slice ;
 : read-backslash ( n string slice -- n' string obj )
@@ -178,7 +179,9 @@ ERROR: backslash-expects-whitespace slice ;
 ! If the slice is 0 width, we stopped on whitespace.
 ! Advance the index and read again!
 : read-token-or-whitespace ( n string slice -- n' string slice )
-    dup length 0 = [ drop [ 1 + ] dip lex ] when ;
+    dup length 0 =
+    [ drop [ 1 + ] dip lex ]
+    [ dup dup token-literal make-literal ] if ;
 
 CONSTANT: factor-lexing-rules {
     T{ til-eol-lexer f CHAR: ! }
@@ -218,7 +221,7 @@ SYMBOL: lexing-delimiters
             { CHAR: \s [ read-token-or-whitespace ] }
             { CHAR: \r [ read-token-or-whitespace ] }
             { CHAR: \n [ read-token-or-whitespace ] }
-            { f [ f like ] }
+            { f [ f like dup [ dup dup token-literal make-literal ] when ] }
         } case
     ] [
         f
