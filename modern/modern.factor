@@ -27,9 +27,10 @@ TUPLE: til-eol-literal < lexed ;
 TUPLE: standalone-only-literal < lexed ;
 
 
-GENERIC: underlying ( obj -- slice )
-M: f underlying ;
-M: object underlying underlying>> ;
+GENERIC: lexed-underlying ( obj -- slice )
+M: f lexed-underlying ;
+M: object lexed-underlying underlying>> ;
+M: slice lexed-underlying ;
 
 ERROR: unknown-literal ch ;
 <<
@@ -53,7 +54,7 @@ ERROR: string-expected-got-eof n string ;
     class new
         tag >>tag
         payload >>payload
-        tag last [ dup token-literal? [ underlying ] when ] bi@
+        tag last [ dup token-literal? [ lexed-underlying ] when ] bi@
         span-slices >>underlying ; inline
 
 ERROR: long-opening-mismatch tag open n string ch ;

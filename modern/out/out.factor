@@ -7,35 +7,39 @@ modern.slices namespaces prettyprint sequences sets splitting
 strings ;
 IN: modern.out
 
-SYMBOL: last-slice
-
-GENERIC: write-modern-literal ( obj -- )
-M: token-literal write-modern-literal payload>> write ;
-M: object write-modern-literal underlying write ;
-! M: single-literal write-modern-literal drop ;
-! M: double-literal write-modern-literal drop ;
-! M: string-literal write-modern-literal drop ;
-! M: backtick-literal write-modern-literal drop ;
-! M: backslash-literal write-modern-literal drop ;
-M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
-! M: standalone-only-literal write-modern-literal drop ;
-
 : write-whitespace ( obj -- )
-    last-slice get
-    [ slice-between ] [ slice-before ] if*
-    >string io:write ;
+    lexed-underlying [ from>> ] [ seq>> ] bi
+    slice-while-whitespace-backwards io:write ;
+
+DEFER: write-modern-literal
+GENERIC: write-modern-literal* ( obj -- )
+M: object write-modern-literal* lexed-underlying write ;
+M: string write-modern-literal* write ;
+M: slice write-modern-literal*
+    [ write-whitespace ] [ write ] bi ;
+
+M: token-literal write-modern-literal* payload>> write ;
+M: single-literal write-modern-literal*
+    [ tag>> write ]
+    [ payload>> [ write-modern-literal ] each ]
+    [
+        [ underlying>> 1 tail-slice* write-whitespace ]
+        [ tag>> last matching-char 1string write ] bi
+    ] tri ;
+! M: double-literal write-modern-literal* drop ;
+! M: string-literal write-modern-literal* drop ;
+! M: backtick-literal write-modern-literal* drop ;
+! M: backslash-literal write-modern-literal* drop ;
+M: til-eol-literal write-modern-literal* [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
+! M: standalone-only-literal write-modern-literal* drop ;
+
+: write-modern-literal ( obj -- )
+    [ write-whitespace ] [ write-modern-literal* ] bi ;
 
 ! Swap in write-modern-literal for renaming
-: write-lexed ( lexed/slice -- )
-    [ underlying write-whitespace ]
-    [ write-modern-literal ]
-    [ underlying last-slice namespaces:set ] tri ;
-
-: with-last-slice ( quot -- )
-    [ f last-slice ] dip with-variable ; inline
 
 : write-modern-loop ( quot -- )
-    [ [ write-lexed ] each nl ] with-last-slice ; inline
+    [ write-modern-literal ] each nl ; inline
 
 : write-modern-string ( seq -- string )
     [ write-modern-loop ] with-string-writer ; inline
