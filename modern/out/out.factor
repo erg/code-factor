@@ -10,14 +10,14 @@ IN: modern.out
 SYMBOL: last-slice
 
 GENERIC: write-modern-literal ( obj -- )
-M: token-literal write-modern-literal payload>> >string write ;
-M: object write-modern-literal underlying >string write ;
+M: token-literal write-modern-literal payload>> write ;
+M: object write-modern-literal underlying write ;
 ! M: single-literal write-modern-literal drop ;
 ! M: double-literal write-modern-literal drop ;
 ! M: string-literal write-modern-literal drop ;
 ! M: backtick-literal write-modern-literal drop ;
 ! M: backslash-literal write-modern-literal drop ;
-M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ >string io:write ] bi@ ;
+M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
 ! M: standalone-only-literal write-modern-literal drop ;
 
 : write-whitespace ( obj -- )
