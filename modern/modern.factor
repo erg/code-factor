@@ -8,6 +8,8 @@ sorting splitting strings unicode ;
 IN: modern
 
 TUPLE: lexed rule tag payload underlying ;
+TUPLE: matched-lexed < lexed opening closing ;
+
 TUPLE: compound-lexed sequence ;
 
 TUPLE: string-lexer delimiter escape ;      ! url"lol.com"  abcddf\aa  [ 1 2 3 ]
@@ -18,9 +20,9 @@ TUPLE: til-eol-lexer delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]
 TUPLE: standalone-only-lexer delimiter ;    ! example:   ! comment   word!
 
 TUPLE: token-literal < lexed ;
-TUPLE: single-literal < lexed ;
-TUPLE: double-literal < lexed ;
-TUPLE: string-literal < lexed ;
+TUPLE: single-literal < matched-lexed ;
+TUPLE: double-literal < matched-lexed ;
+TUPLE: string-literal < matched-lexed ;
 TUPLE: backtick-literal < lexed ;
 TUPLE: backslash-literal < lexed ;
 TUPLE: til-eol-literal < lexed ;
@@ -57,31 +59,35 @@ ERROR: string-expected-got-eof n string ;
         tag last [ dup token-literal? [ lexed-underlying ] when ] bi@
         span-slices >>underlying ; inline
 
+:: make-matched-literal ( payload closing tag opening class -- literal )
+    payload closing tag class make-literal
+        opening >>opening ; inline
+
 ERROR: long-opening-mismatch tag open n string ch ;
 
 ! (( )) [[ ]] {{ }}
 MACRO:: read-long ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
-    open-ch dup matching-char {
+    open-ch dup matching-delimiter {
         [ drop 2 swap <string> ]
         [ drop 1string ]
-        [ nip 1string ]
         [ nip 2 swap <string> ]
-    } 2cleave :> ( openstr2 openstr1 closestr1 closestr2 )
-    [| n string tag ch |
+    } 2cleave :> ( openstr2 openstr1 closestr2 )
+    [| n string tag! ch |
         ch {
             { CHAR: = [
-                n string openstr1 slice-until-separator-inclusive :> (  n' string' tag2 ch )
-                ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ]  unless
-                tag2 length 1 - CHAR: = <string> closestr1 closestr1 surround :> needle
+                n string openstr1 slice-until-separator-inclusive [ -1 modify-from ] dip :> ( n' string' opening ch )
+                ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ] unless
+                opening matching-delimiter-string :> needle
 
-                n' string' needle slice-until-string :> ( n'' string'' payload end )
+                n' string' needle slice-until-string :> ( n'' string'' payload closing )
                 n'' string
-                payload end tag double-literal make-literal
+                payload closing tag opening double-literal make-matched-literal
             ] }
             { open-ch [
-                n 1 + string closestr2 slice-until-string :> ( n' string' payload end )
+                tag 1 cut-slice* swap tag! 1 modify-to :> opening
+                n 1 + string closestr2 slice-until-string :> ( n' string' payload closing )
                 n' string
-                payload end tag double-literal make-literal
+                payload closing tag opening double-literal make-matched-literal
             ] }
             [ [ tag openstr2 n string ] dip long-opening-mismatch ]
         } case
@@ -114,7 +120,7 @@ ERROR: lex-expected-but-got-eof n string expected ;
     ] if ;
 
 MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
-    ch dup matching-char {
+    ch dup matching-delimiter {
         [ drop "=" swap prefix ]
         [ nip 1string ]
         [ drop lookup-literal ]
@@ -123,10 +129,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
         n string tag
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-long ] } ! (=( or ((
-            { [ dup blank? ] [
-                drop [
-                    closestr1 lex-until  
-                ] dip literal make-literal ] } ! ( foo )
+            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* literal make-matched-literal ] } ! ( foo )
             [ drop [ slice-until-whitespace drop ] dip span-slices dup dup token-literal make-literal ]  ! (foo)
         } cond
     ] ;

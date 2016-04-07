@@ -4,13 +4,16 @@ USING: accessors assocs fry kernel locals math math.private
 modern sequences sequences.extras sequences.private unicode ;
 IN: modern.slices
 
-: matching-char ( ch -- ch' )
+: matching-delimiter ( ch -- ch' )
     H{
         { CHAR: ( CHAR: ) }
         { CHAR: [ CHAR: ] }
         { CHAR: { CHAR: } }
         { CHAR: < CHAR: > }
     } ?at drop ;
+
+: matching-delimiter-string ( string -- string' )
+    [ matching-delimiter ] map ;
 
 ERROR: unexpected-end n string ;
 : nth-check-eof ( n string -- nth )
@@ -96,6 +99,9 @@ ERROR: unexpected-end n string ;
     n' search length +  string
     n n' string ?<slice>
     n' dup search length + string ?<slice> ;
+
+: modify-from ( slice n -- slice' )
+    '[ from>> _ + ] [ to>> ] [ seq>> ] tri <slice> ;
 
 : modify-to ( slice n -- slice' )
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip

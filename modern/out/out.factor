@@ -1,10 +1,10 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors combinators.short-circuit combinators.smart
-continuations fry io io.encodings.string io.encodings.utf8
-io.files io.streams.string kernel modern modern.paths
-modern.slices namespaces prettyprint sequences sets splitting
-strings ;
+USING: accessors combinators combinators.short-circuit
+combinators.smart continuations fry io io.encodings.string
+io.encodings.utf8 io.files io.streams.string kernel modern
+modern.paths modern.slices namespaces prettyprint sequences sets
+splitting strings ;
 IN: modern.out
 
 : write-whitespace ( obj -- )
@@ -20,13 +20,26 @@ M: slice write-modern-literal*
 
 M: token-literal write-modern-literal* payload>> write ;
 M: single-literal write-modern-literal*
-    [ tag>> write ]
-    [ payload>> [ write-modern-literal ] each ]
-    [
-        [ underlying>> 1 tail-slice* write-whitespace ]
-        [ tag>> last matching-char 1string write ] bi
-    ] tri ;
-! M: double-literal write-modern-literal* drop ;
+    {
+        [ tag>> write ]
+        [ opening>> write ]
+        [ payload>> [ write-modern-literal ] each ]
+        [
+            ! Use the underlying for position, but get the
+            ! matching-delimiter from the possible refactored tag
+            [ underlying>> 1 tail-slice* write-whitespace ]
+            [ opening>> matching-delimiter-string write ] bi
+        ]
+    } cleave ;
+
+M: double-literal write-modern-literal*
+    {
+        [ tag>> io:write ]
+        [ opening>> io:write ]
+        [ payload>> io:write ]
+        [ opening>> matching-delimiter-string io:write ]
+    } cleave ;
+
 ! M: string-literal write-modern-literal* drop ;
 ! M: backtick-literal write-modern-literal* drop ;
 ! M: backslash-literal write-modern-literal* drop ;
