@@ -1,10 +1,11 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors continuations io io.encodings.string
-io.encodings.utf8 io.files io.streams.string kernel modern
-modern.paths modern.slices namespaces prettyprint sequences sets
-strings ;
+USING: accessors combinators.short-circuit continuations io
+io.encodings.string io.encodings.utf8 io.files io.streams.string
+kernel modern modern.paths modern.slices namespaces prettyprint
+sequences sets splitting strings ;
 IN: modern.out
+
 SYMBOL: last-slice
 
 GENERIC: underlying ( obj -- slice )
@@ -14,13 +15,12 @@ M: object underlying underlying>> ;
 GENERIC: write-modern-literal ( obj -- )
 M: token-literal write-modern-literal payload>> write ;
 M: object write-modern-literal underlying write ;
-
 ! M: single-literal write-modern-literal drop ;
 ! M: double-literal write-modern-literal drop ;
 ! M: string-literal write-modern-literal drop ;
 ! M: backtick-literal write-modern-literal drop ;
 ! M: backslash-literal write-modern-literal drop ;
-! M: til-eol-literal write-modern-literal drop ;
+M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
 ! M: standalone-only-literal write-modern-literal drop ;
 
 : write-whitespace ( obj -- )
@@ -103,6 +103,7 @@ M: object write-modern-literal underlying write ;
         "resource:basis/xml/elements/elements.factor"
         "resource:basis/xml/entities/entities.factor"
     } diff rewrite-paths ;
+
 : rewrite-extra ( -- )
     extra-source-paths {
         "resource:extra/brainfuck/brainfuck.factor"  ! EBNF: [[ ]] ;
@@ -151,3 +152,22 @@ M: object write-modern-literal underlying write ;
         "resource:extra/trees/splay/splay.factor"
         "resource:extra/yaml/conversion/conversion.factor"
     } diff rewrite-paths ;
+
+: paren-word>tick-word ( string -- string' )
+    dup [ "(" ?head drop ")" ?tail drop "'" append ] [ ] if ;
+
+: paren-word-name? ( string -- ? )
+    { [ "(" head? ] [ ")" tail? ] } 1&& ;
+
+: transform-paren-word>tick-word ( token -- token' )
+    dup { [ token-literal? ] [ payload>> paren-word-name? ] } 1&& [
+        [ paren-word>tick-word ] change-payload
+    ] when ;
+
+: single-line-comment? ( token -- ? )
+    { [ til-eol-literal? ] [ tag>> "!" tail? ] } 1&& ;
+
+: transform-single-line-comment>hash-comment ( token -- token' )
+    dup single-line-comment? [
+        [ "!" ?tail drop "#" append ] change-tag
+    ] when ;
