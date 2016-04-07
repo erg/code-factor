@@ -2,7 +2,7 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays assocs assocs.extras combinators
 combinators.short-circuit continuations fry io.encodings.utf8
-io.files kernel locals make math modern.out modern.paths
+io.files kernel locals make math modern.paths
 modern.slices multiline namespaces sequences sequences.extras
 sorting splitting strings unicode ;
 IN: modern
@@ -25,6 +25,11 @@ TUPLE: backtick-literal < lexed ;
 TUPLE: backslash-literal < lexed ;
 TUPLE: til-eol-literal < lexed ;
 TUPLE: standalone-only-literal < lexed ;
+
+
+GENERIC: underlying ( obj -- slice )
+M: f underlying ;
+M: object underlying underlying>> ;
 
 ERROR: unknown-literal ch ;
 <<

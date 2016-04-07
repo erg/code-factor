@@ -1,26 +1,23 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors combinators.short-circuit continuations io
-io.encodings.string io.encodings.utf8 io.files io.streams.string
-kernel modern modern.paths modern.slices namespaces prettyprint
-sequences sets splitting strings ;
+USING: accessors combinators.short-circuit combinators.smart
+continuations fry io io.encodings.string io.encodings.utf8
+io.files io.streams.string kernel modern modern.paths
+modern.slices namespaces prettyprint sequences sets splitting
+strings ;
 IN: modern.out
 
 SYMBOL: last-slice
 
-GENERIC: underlying ( obj -- slice )
-M: f underlying ;
-M: object underlying underlying>> ;
-
 GENERIC: write-modern-literal ( obj -- )
-M: token-literal write-modern-literal payload>> write ;
-M: object write-modern-literal underlying write ;
+M: token-literal write-modern-literal payload>> >string write ;
+M: object write-modern-literal underlying >string write ;
 ! M: single-literal write-modern-literal drop ;
 ! M: double-literal write-modern-literal drop ;
 ! M: string-literal write-modern-literal drop ;
 ! M: backtick-literal write-modern-literal drop ;
 ! M: backslash-literal write-modern-literal drop ;
-M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
+M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ >string io:write ] bi@ ;
 ! M: standalone-only-literal write-modern-literal drop ;
 
 : write-whitespace ( obj -- )
@@ -46,14 +43,18 @@ M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] 
 : write-modern-path ( seq path -- )
     utf8 [ write-modern-loop ] with-file-writer ; inline
 
-: rewrite-modern-path ( path -- )
+: rewrite-path ( path quot -- )
     ! dup print
-    [ [ path>literals ] [ ] bi write-modern-path ]
-    [ drop . ] recover ;
+    '[ [ path>literals _ map ] [ ] bi write-modern-path ]
+    [ drop . ] recover ; inline
 
-: rewrite-paths ( seq -- ) [ rewrite-modern-path ] each ;
-: rewrite-core ( -- ) core-source-paths rewrite-paths ;
-: rewrite-basis ( -- )
+: rewrite-string ( string quot -- )
+    ! dup print
+    [ string>literals ] dip map write-modern-string ; inline
+
+: rewrite-paths ( seq quot -- ) '[ _ rewrite-path ] each ; inline
+: lexable-core-paths ( -- seq ) core-source-paths ;
+: lexable-basis-paths ( -- seq )
     basis-source-paths {
         "resource:basis/bit-arrays/bit-arrays.factor"
         "resource:basis/bit-vectors/bit-vectors.factor"
@@ -102,9 +103,9 @@ M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] 
         "resource:basis/xml/dtd/dtd.factor"
         "resource:basis/xml/elements/elements.factor"
         "resource:basis/xml/entities/entities.factor"
-    } diff rewrite-paths ;
+    } diff ;
 
-: rewrite-extra ( -- )
+: lexable-extra-paths ( -- seq )
     extra-source-paths {
         "resource:extra/brainfuck/brainfuck.factor"  ! EBNF: [[ ]] ;
         "resource:extra/cuesheet/cuesheet.factor"    ! CHAR: "
@@ -151,7 +152,14 @@ M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] 
         "resource:extra/trees/avl/avl.factor"
         "resource:extra/trees/splay/splay.factor"
         "resource:extra/yaml/conversion/conversion.factor"
-    } diff rewrite-paths ;
+    } diff ;
+
+: lexable-paths ( -- seq )
+    [
+        lexable-core-paths
+        lexable-basis-paths
+        lexable-extra-paths
+    ] append-outputs ;
 
 : paren-word>tick-word ( string -- string' )
     dup [ "(" ?head drop ")" ?tail drop "'" append ] [ ] if ;
@@ -171,3 +179,6 @@ M: til-eol-literal write-modern-literal [ tag>> ] [ payload>> ] bi [ io:write ] 
     dup single-line-comment? [
         [ "!" ?tail drop "#" append ] change-tag
     ] when ;
+
+: transform-source ( quot -- )
+    lexable-paths swap rewrite-paths ; inline
