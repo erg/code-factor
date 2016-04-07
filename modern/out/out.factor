@@ -31,8 +31,7 @@ M: object write-modern-literal underlying write ;
 ! Swap in write-modern-literal for renaming
 : write-lexed ( lexed/slice -- )
     [ underlying write-whitespace ]
-    [ underlying >string io:write ]
-!    [ write-modern-literal ]
+    [ write-modern-literal ]
     [ underlying last-slice namespaces:set ] tri ;
 
 : with-last-slice ( quot -- )
