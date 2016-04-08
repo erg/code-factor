@@ -31,9 +31,8 @@ M: single-literal write-modern-literal
         [ tag>> write ]
         [ seq>> 1 swap nth write-whitespace ]
         [ opening>> write ]
-        [ seq>> 2 swap nth write-whitespace ]
-        [ payload>> [ write-modern-literal ] each ]
-        [ seq>> 3 swap nth write-whitespace ]
+        [ [ seq>> 2 swap nth ] [ payload>> ] bi [ [ lexed-underlying write-whitespace ] [ lexed-underlying io:write ] bi* ] 2each ]
+        [ seq>> 3 swap nth lexed-underlying write-whitespace ]
         [ opening>> matching-delimiter-string write ]
     } cleave ;
 
@@ -41,8 +40,11 @@ M: double-literal write-modern-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
         [ opening>> io:write ]
+        [ seq>> 2 swap nth write-whitespace ]
         [ payload>> io:write ]
+        [ seq>> 3 swap nth write-whitespace ]
         [ opening>> matching-delimiter-string io:write ]
     } cleave ;
 
@@ -50,8 +52,11 @@ M: string-literal write-modern-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
         [ opening>> io:write ]
+        [ seq>> 2 swap nth write-whitespace ]
         [ payload>> io:write ]
+        [ seq>> 3 swap nth write-whitespace ]
         [ opening>> matching-delimiter-string io:write ]
     } cleave ;
 

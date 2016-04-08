@@ -24,3 +24,6 @@ IN: modern.out.tests
 
 
 { "^ foo  ^    bar" } [ "\\ foo  \\    bar" rename-backslash-delimiter ] unit-test
+
+
+! lexable-paths [ transform-single-line-comment>hash-comment ] rewrite-paths

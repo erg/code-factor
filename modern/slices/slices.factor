@@ -111,10 +111,10 @@ ERROR: unexpected-end n string ;
     [ slice-until-whitespace drop ] dip merge-slices ;
 
 : slice-between ( slice1 slice2 -- slice )
-    ensure-same-underlying
+    ! ensure-same-underlying
     slice-order-by-from
     [ to>> ]
-    [ [ from>> ] [ seq>> ] bi ] bi* <slice> ;
+    [ [ from>> 2dup < [ swap ] unless ] [ seq>> ] bi ] bi* <slice> ;
 
 : slice-before ( slice -- slice' )
     [ drop 0 ] [ from>> ] [ seq>> ] tri <slice> ;
