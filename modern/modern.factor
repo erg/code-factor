@@ -43,19 +43,6 @@ M: f lexed-underlying ;
 M: object lexed-underlying underlying>> ;
 M: slice lexed-underlying ;
 
-ERROR: unknown-literal ch ;
-<<
-: lookup-literal ( ch -- literal )
-    H{
-        { CHAR: [ matched-literal }
-        { CHAR: { matched-literal }
-        { CHAR: ( matched-literal }
-        { CHAR: " dquote-literal }
-        { CHAR: ` backtick-literal }
-        { CHAR: \ backslash-literal }
-    } clone ?at [ unknown-literal ] unless ;
->>
-
 ERROR: whitespace-expected-after n string ch ;
 ERROR: subseq-expected-but-got-eof n string expected ;
 ERROR: expected-more-tokens n string expected ;
@@ -151,8 +138,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     ch dup matching-delimiter {
         [ drop "=" swap prefix ]
         [ nip 1string ]
-        [ drop lookup-literal ]
-    } 2cleave :> ( openstreq closestr1 literal )  ! [= ]
+    } 2cleave :> ( openstreq closestr1 )  ! [= ]
     [| n string tag |
         n string tag
         2over nth-check-eof {
