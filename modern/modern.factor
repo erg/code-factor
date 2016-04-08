@@ -2,16 +2,18 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays assocs assocs.extras combinators
 combinators.short-circuit continuations fry io.encodings.utf8
-io.files kernel locals make math modern.paths
-modern.slices multiline namespaces sequences sequences.extras
-sorting splitting strings unicode ;
+io.files kernel locals macros make math modern.paths
+modern.slices multiline namespaces quotations sequences
+sequences.extras sorting splitting strings unicode ;
 IN: modern
+
 
 TUPLE: string-lexer handler delimiter escape ;      ! url"lol.com"  abcddf\aa  [ 1 2 3 ]
 TUPLE: matching-lexer handler delimiter ;           ! foo[ ] foo[[ ]] foo[lol[ ]lol]
 TUPLE: backtick-lexer handler delimiter ;           ! fixnum`3           ! has no space after
 TUPLE: backslash-lexer handler delimiter ;          ! word\ something    ! has a space after
 TUPLE: til-eol-lexer handler delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
+TUPLE: whitespace-lexer handler delimiter ;
 
 TUPLE: literal underlying seq ;
 TUPLE: tag-literal < literal tag ;
@@ -114,13 +116,14 @@ MACRO:: read-long ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
 : read-long-brace ( n string tag ch -- n' string seq ) CHAR: { read-long ;
 
 DEFER: lex
+DEFER: lex-factor
 ERROR: lex-expected-but-got-eof n string expected ;
 ! For implementing [ { (
 : lex-until ( n string token -- n' string payload closing )
     pick [
         3dup '[
             [
-                lex dup , [
+                lex-factor dup , [
                     dup tag-literal? [
                         underlying>> _ sequence= not
                     ] [
@@ -205,7 +208,7 @@ ERROR: backslash-expects-whitespace slice ;
 ! Advance the index and read again!
 : read-token-or-whitespace ( n string slice -- n' string slice )
     dup length 0 =
-    [ drop [ 1 + ] dip lex ]
+    [ drop [ 1 + ] dip lex-factor ]
     [ make-tag-literal ] if ;
 
 
@@ -220,25 +223,19 @@ SYMBOL: lexing-delimiters
         lexing-delimiters get
     ] with-variable ;
 
-: lexer-rules-delimiters ( hashtable -- seq )
-    keys natural-sort "\r\n " "" append-as ;
+: lexer-rules>delimiters ( seq -- string )
+    [ delimiter>> ] "" map-as ;
 
-: lex ( n/f string -- n'/f string literal )
-    "!`([{\"\s\r\n\\" slice-until-either {
-        { CHAR: ! [ read-exclamation ] }
-        { CHAR: ` [ read-backtick ] }
-        { CHAR: \ [ read-backslash ] }
-        { CHAR: " [ read-string ] }
-        { CHAR: [ [ read-bracket ] }
-        { CHAR: { [ read-brace ] }
-        { CHAR: ( [ read-paren ] }
-        { CHAR: \s [ read-token-or-whitespace ] }
-        { CHAR: \r [ read-token-or-whitespace ] }
-        { CHAR: \n [ read-token-or-whitespace ] }
-        { f [ f like dup [ make-tag-literal ] when ] }
-    } case ; inline recursive
+: lexer-rules>assoc ( seq -- seq' )
+    [ [ delimiter>> ] [ handler>> 1quotation ] bi ] { } map>assoc ;
 
-! MACRO: make-lexer ( seq -- quot )  ;
+MACRO: make-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
+    [ lexer-rules>delimiters ]
+    [
+        lexer-rules>assoc
+        { f [ f like dup [ make-tag-literal ] when ] } suffix
+    ] bi
+    '[ _ slice-until-either _ case ] ;
 
 CONSTANT: factor-lexing-rules {
     T{ til-eol-lexer f read-exclamation CHAR: ! }
@@ -248,10 +245,16 @@ CONSTANT: factor-lexing-rules {
     T{ matching-lexer f read-bracket CHAR: [ }
     T{ matching-lexer f read-brace CHAR: { }
     T{ matching-lexer f read-paren CHAR: ( }
+    T{ whitespace-lexer f read-token-or-whitespace CHAR: \s }
+    T{ whitespace-lexer f read-token-or-whitespace CHAR: \r }
+    T{ whitespace-lexer f read-token-or-whitespace CHAR: \n }
 }
 
+: lex-factor ( n/f string -- n'/f string literal )
+    factor-lexing-rules make-lexer ;
+
 : string>literals ( string -- sequence )
-    [ 0 ] dip [ lex ] loop>array 2nip ;
+    [ 0 ] dip [ lex-factor ] loop>array 2nip ;
 
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop
@@ -265,3 +268,23 @@ CONSTANT: factor-lexing-rules {
 
 : filter-lex-errors ( assoc -- assoc' )
     [ nip array? not ] assoc-filter ;
+
+
+/*
+
+! What a lexer body looks like, produced by make-lexer
+: lex ( n/f string -- n'/f string literal )
+    "!`\\\"[{(\s\r\n" slice-until-either {
+        { CHAR: ! [ read-exclamation ] }
+        { CHAR: ` [ read-backtick ] }
+        { CHAR: \ [ read-backslash ] }
+        { CHAR: " [ read-string ] }
+        { CHAR: [ [ read-bracket ] }
+        { CHAR: { [ read-brace ] }
+        { CHAR: ( [ read-paren ] }
+        { CHAR: \s [ read-token-or-whitespace ] }
+        { CHAR: \r [ read-token-or-whitespace ] }
+        { CHAR: \n [ read-token-or-whitespace ] }
+        { f [ f like dup [ make-tag-literal ] when ] }
+    } case ; inline
+*/
