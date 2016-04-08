@@ -64,18 +64,22 @@ ERROR: unexpected-end n string ;
         [ [ 1 - ] change-to ] dip
     ] when ;
 
-:: slice-until-either ( n string tokens -- n' string slice/f ch )
-    n string '[ tokens member? ] find-from
-    dup "\s\r\n" member? [
-        :> ( n' ch )
-        n' string
-        n n' string ?<slice>
-        ch
+:: slice-until-either ( n string tokens -- n'/f string slice/f ch )
+    n [
+        n string '[ tokens member? ] find-from
+        dup "\s\r\n" member? [
+            :> ( n' ch )
+            n' string
+            n n' string ?<slice>
+            ch
+        ] [
+            [ dup [ 1 + ] when ] dip :> ( n' ch )
+            n' string
+            n n' string ?<slice>
+            ch
+        ] if
     ] [
-        [ dup [ 1 + ] when ] dip :> ( n' ch )
-        n' string
-        n n' string ?<slice>
-        ch
+        f string f f
     ] if ; inline
 
 : skip-one-space-after ( n string -- n' string )
