@@ -226,16 +226,16 @@ M: til-eol-literal write-modern-literal
     { [ "(" head? ] [ ")" tail? ] } 1&& ;
 
 : transform-paren-word>tick-word ( token -- token' )
-    dup { [ tag-literal? ] [ payload>> paren-word-name? ] } 1&& [
-        [ paren-word>tick-word ] change-payload
+    dup { [ tag-literal? ] [ tag>> paren-word-name? ] } 1&& [
+        [ paren-word>tick-word ] change-tag
     ] when ;
 
 : single-line-comment? ( token -- ? )
-    { [ til-eol-literal? ] [ tag>> "!" tail? ] } 1&& ;
+    { [ til-eol-literal? ] [ delimiter>> "!" sequence= ] } 1&& ;
 
 : transform-single-line-comment>hash-comment ( token -- token' )
     dup single-line-comment? [
-        [ "!" ?tail drop "#" append ] change-tag
+        [ drop "#" ] change-delimiter
     ] when ;
 
 : transform-source ( quot -- )
