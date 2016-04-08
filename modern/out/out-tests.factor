@@ -24,13 +24,12 @@ IN: modern.out.tests
 
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 
-
 { "^ foo  ^    bar" } [ "\\ foo  \\    bar" rename-backslash-delimiter ] unit-test
 
 { ": asdf < '< > > ;" } [
     ": asdf [ '[ ] ] ;" [
-        dup { [ single-match-literal? ] [ opening>> "[" = ] } 1&& [
-        [ drop "<" ] change-opening
+        dup { [ single-matched-literal? ] [ delimiter>> "[" = ] } 1&& [
+        [ drop "<" ] change-delimiter
         ] when
     ] rewrite-string
 ] unit-test

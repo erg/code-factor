@@ -7,27 +7,36 @@ modern.slices multiline namespaces quotations sequences
 sequences.extras sorting splitting strings unicode ;
 IN: modern
 
+! Base rules, everything should have a generator macro and optional sublexers
+TUPLE: lexer generator ;
+TUPLE: lexer-with-sublexers < lexer sublexers ;
 
-TUPLE: string-lexer handler delimiter escape ;      ! url"lol.com"  abcddf\aa  [ 1 2 3 ]
-TUPLE: matching-lexer handler delimiter ;           ! foo[ ] foo[[ ]] foo[lol[ ]lol]
-TUPLE: backtick-lexer handler delimiter ;           ! fixnum`3           ! has no space after
-TUPLE: backslash-lexer handler delimiter ;          ! word\ something    ! has a space after
-TUPLE: til-eol-lexer handler delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
-TUPLE: whitespace-lexer handler delimiter ;
+! Declarative rules, add more!
+TUPLE: tag-lexer < lexer ; ! default, if nothing else matches, add one with regexp for c-style names etc
+TUPLE: exact-tag-lexer < lexer token ;
+TUPLE: dquote-lexer < lexer delimiter escape ignore-whitespace? ; ! ``close`` slot someday to allow ` '
+TUPLE: matched-lexer < lexer-with-sublexers delimiter double-char ; ! ``close`` slot someday, to allow `` ''
+TUPLE: backtick-lexer < lexer delimiter ;
+TUPLE: backslash-lexer < lexer delimiter payload-exception? ; ! payload-exception is \n words
+TUPLE: line-comment-lexer < lexer delimiter word-name-exception? ; ! escape-newline-exception? (like C)
+TUPLE: whitespace-lexer < lexer delimiter ; ! \s \r \n \t?
 
-TUPLE: literal underlying seq ;
+! Base lexer result
+TUPLE: literal underlying seq lexer ;
 TUPLE: tag-literal < literal tag ;
-TUPLE: tag-delimiter-payload-literal < literal tag delimiter payload ;
-TUPLE: tag-matched-literal < literal tag opening payload closing ;
+TUPLE: matched-literal < tag-literal delimiter payload ;
+TUPLE: delimited-literal < tag-literal delimiter payload ;
+
+TUPLE: exact-tag-literal < tag-literal ;
+TUPLE: dquote-literal < delimited-literal ;
+TUPLE: single-matched-literal < matched-literal ;
+TUPLE: double-matched-literal < matched-literal ;
+TUPLE: backtick-literal < delimited-literal ;
+TUPLE: backslash-literal < delimited-literal ;
+TUPLE: line-comment-literal < delimited-literal ;
+TUPLE: whitespace-literal < tag-literal ;
 
 TUPLE: compound-literal sequence ;
-
-TUPLE: single-match-literal < tag-matched-literal ;
-TUPLE: double-match-literal < tag-matched-literal ;
-TUPLE: string-literal < tag-matched-literal ;
-TUPLE: backtick-literal < tag-delimiter-payload-literal  ;
-TUPLE: backslash-literal < tag-delimiter-payload-literal ;
-TUPLE: til-eol-literal < tag-delimiter-payload-literal ;
 
 GENERIC: lexed-underlying ( obj -- slice )
 M: f lexed-underlying ;
@@ -38,10 +47,10 @@ ERROR: unknown-literal ch ;
 <<
 : lookup-literal ( ch -- literal )
     H{
-        { CHAR: [ single-match-literal }
-        { CHAR: { single-match-literal }
-        { CHAR: ( single-match-literal }
-        { CHAR: " string-literal }
+        { CHAR: [ matched-literal }
+        { CHAR: { matched-literal }
+        { CHAR: ( matched-literal }
+        { CHAR: " dquote-literal }
         { CHAR: ` backtick-literal }
         { CHAR: \ backslash-literal }
     } clone ?at [ unknown-literal ] unless ;
@@ -73,18 +82,18 @@ ERROR: string-expected-got-eof n string ;
         delimiter >string >>delimiter
         tag delimiter payload 3array >>seq ; inline
 
-:: make-tag-matched-literal ( payload closing tag opening class -- literal )
+:: make-matched-literal ( payload closing tag opening class -- literal )
     class new
         tag >string >>tag
         payload >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ span-slices >>underlying
-        opening >string >>opening
+        opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
 
 ERROR: long-opening-mismatch tag open n string ch ;
 
 ! (( )) [[ ]] {{ }}
-MACRO:: read-long ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
+MACRO:: read-double-matched ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
     open-ch dup matching-delimiter {
         [ drop 2 swap <string> ]
         [ drop 1string ]
@@ -99,21 +108,21 @@ MACRO:: read-long ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
 
                 n' string' needle slice-until-string :> ( n'' string'' payload closing )
                 n'' string
-                payload closing tag opening double-match-literal make-tag-matched-literal
+                payload closing tag opening double-matched-literal make-matched-literal
             ] }
             { open-ch [
                 tag 1 cut-slice* swap tag! 1 modify-to :> opening
                 n 1 + string closestr2 slice-until-string :> ( n' string' payload closing )
                 n' string
-                payload closing tag opening double-match-literal make-tag-matched-literal
+                payload closing tag opening double-matched-literal make-matched-literal
             ] }
             [ [ tag openstr2 n string ] dip long-opening-mismatch ]
         } case
      ] ;
 
-: read-long-paren ( n string tag ch -- n' string seq ) CHAR: ( read-long ;
-: read-long-bracket ( n string tag ch -- n' string seq ) CHAR: [ read-long ;
-: read-long-brace ( n string tag ch -- n' string seq ) CHAR: { read-long ;
+: read-double-matched-paren ( n string tag ch -- n' string seq ) CHAR: ( read-double-matched ;
+: read-double-matched-bracket ( n string tag ch -- n' string seq ) CHAR: [ read-double-matched ;
+: read-double-matched-brace ( n string tag ch -- n' string seq ) CHAR: { read-double-matched ;
 
 DEFER: lex
 DEFER: lex-factor
@@ -138,7 +147,7 @@ ERROR: lex-expected-but-got-eof n string expected ;
         lex-expected-but-got-eof
     ] if ;
 
-MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
+MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     ch dup matching-delimiter {
         [ drop "=" swap prefix ]
         [ nip 1string ]
@@ -147,15 +156,15 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
     [| n string tag |
         n string tag
         2over nth-check-eof {
-            { [ dup openstreq member? ] [ ch read-long ] } ! (=( or ((
-            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-match-literal make-tag-matched-literal ] } ! ( foo )
+            { [ dup openstreq member? ] [ ch read-double-matched ] } ! (=( or ((
+            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-matched-literal make-matched-literal ] } ! ( foo )
             [ drop [ slice-until-whitespace drop ] dip span-slices make-tag-literal ]  ! (foo)
         } cond
     ] ;
 
-: read-paren ( n string slice -- n' string slice' ) CHAR: ( read-matching ;
-: read-brace ( n string slice -- n' string slice' ) CHAR: { read-matching ;
-: read-bracket ( n string slice -- n' string slice' ) CHAR: [ read-matching ;
+: read-paren ( n string slice -- n' string slice' ) CHAR: ( read-matched ;
+: read-brace ( n string slice -- n' string slice' ) CHAR: { read-matched ;
+: read-bracket ( n string slice -- n' string slice' ) CHAR: [ read-matched ;
 
 : read-backtick ( n string opening -- n' string obj )
     [
@@ -180,13 +189,13 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
     n' [ n string string-expected-got-eof ] unless
     n n' 1 - string <slice>
     n' 1 - n' string <slice>
-    tag 1 cut-slice* string-literal make-tag-matched-literal ;
+    tag 1 cut-slice* dquote-literal make-matched-literal ;
 
 : take-comment ( n string slice -- n' string comment )
     2over ?nth CHAR: [ = [
-        [ 1 + ] 2dip 2over ?nth read-long-bracket
+        [ 1 + ] 2dip 2over ?nth read-double-matched-bracket
     ] [
-        [ slice-til-eol-from drop dup ] dip 1 cut-slice* til-eol-literal make-delimited-literal
+        [ slice-til-eol-from drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
     ] if ;
 
 ! Words like append! and suffix! are allowed for now.
@@ -211,12 +220,19 @@ ERROR: backslash-expects-whitespace slice ;
     [ drop [ 1 + ] dip lex-factor ]
     [ make-tag-literal ] if ;
 
+! MACRO:: make-read-token-or-whitespace ( lex -- quot: ( n string slice -- n' string slice ) )
+!     [
+!        dup length 0 =
+!        [ drop [ 1 + ] dip lex ]
+!        [ make-tag-literal ] if ;
+!    ] ;
 
 SYMBOL: lexing-delimiters
 
 : add-lexing-delimiter ( rule -- )
     [ ] [ delimiter>> ] bi lexing-delimiters get set-once-at ;
 
+<<
 : lexer-rules>hashtable ( seq -- obj )
     H{ } clone lexing-delimiters [
         [ add-lexing-delimiter ] each
@@ -227,7 +243,8 @@ SYMBOL: lexing-delimiters
     [ delimiter>> ] "" map-as ;
 
 : lexer-rules>assoc ( seq -- seq' )
-    [ [ delimiter>> ] [ handler>> 1quotation ] bi ] { } map>assoc ;
+    [ [ delimiter>> ] [ generator>> 1quotation ] bi ] { } map>assoc ;
+>>
 
 MACRO: make-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
     [ lexer-rules>delimiters ]
@@ -238,16 +255,16 @@ MACRO: make-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
     '[ _ slice-until-either _ case ] ;
 
 CONSTANT: factor-lexing-rules {
-    T{ til-eol-lexer f read-exclamation CHAR: ! }
-    T{ backtick-lexer f read-backtick CHAR: ` }
-    T{ backslash-lexer f read-backslash CHAR: \ }
-    T{ string-lexer f read-string CHAR: " CHAR: \ }
-    T{ matching-lexer f read-bracket CHAR: [ }
-    T{ matching-lexer f read-brace CHAR: { }
-    T{ matching-lexer f read-paren CHAR: ( }
-    T{ whitespace-lexer f read-token-or-whitespace CHAR: \s }
-    T{ whitespace-lexer f read-token-or-whitespace CHAR: \r }
-    T{ whitespace-lexer f read-token-or-whitespace CHAR: \n }
+    T{ line-comment-lexer { generator read-exclamation } { delimiter CHAR: ! } }
+    T{ backtick-lexer { generator read-backtick } { delimiter CHAR: ` } }
+    T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
+    T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
+    T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
+    T{ matched-lexer { generator read-brace } { delimiter CHAR: { } }
+    T{ matched-lexer { generator read-paren } { delimiter CHAR: ( } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \s } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \r } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \n } }
 }
 
 : lex-factor ( n/f string -- n'/f string literal )
@@ -271,7 +288,6 @@ CONSTANT: factor-lexing-rules {
 
 
 /*
-
 ! What a lexer body looks like, produced by make-lexer
 : lex ( n/f string -- n'/f string literal )
     "!`\\\"[{(\s\r\n" slice-until-either {

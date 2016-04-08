@@ -25,39 +25,39 @@ M: tag-literal write-literal
         [ tag>> write ]
     } cleave ;
 
-M: single-match-literal write-literal
+M: single-matched-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> write ]
         [ seq>> 1 swap nth write-whitespace ]
-        [ opening>> write ]
+        [ delimiter>> write ]
         [ payload>> [ write-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ seq>> 3 swap nth lexed-underlying write-whitespace ]
-        [ opening>> matching-delimiter-string write ]
+        [ delimiter>> matching-delimiter-string write ]
     } cleave ;
 
-M: double-match-literal write-literal
+M: double-matched-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
         [ seq>> 1 swap nth write-whitespace ]
-        [ opening>> io:write ]
+        [ delimiter>> io:write ]
         [ seq>> 2 swap nth write-whitespace ]
         [ payload>> io:write ]
         [ seq>> 3 swap nth write-whitespace ]
-        [ opening>> matching-delimiter-string io:write ]
+        [ delimiter>> matching-delimiter-string io:write ]
     } cleave ;
 
-M: string-literal write-literal
+M: dquote-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
         [ seq>> 1 swap nth write-whitespace ]
-        [ opening>> io:write ]
+        [ delimiter>> io:write ]
         [ seq>> 2 swap nth write-whitespace ]
         [ payload>> io:write ]
         [ seq>> 3 swap nth write-whitespace ]
-        [ opening>> matching-delimiter-string io:write ]
+        [ delimiter>> matching-delimiter-string io:write ]
     } cleave ;
 
 M: backtick-literal write-literal
@@ -80,7 +80,7 @@ M: backslash-literal write-literal
         [ payload>> io:write ]
     } cleave ;
 
-M: til-eol-literal write-literal
+M: line-comment-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -102,7 +102,7 @@ M: til-eol-literal write-literal
     utf8 [ write-modern-loop nl ] with-file-writer ; inline
 
 : map-literals ( obj quot: ( obj -- obj' ) -- seq )
-    over single-match-literal? [
+    over single-matched-literal? [
         [ call drop ] [ '[ [ _ map-literals ] map ] change-payload ] 2bi
     ] [
         call
@@ -250,7 +250,7 @@ M: til-eol-literal write-literal
     ] when ;
 
 : single-line-comment? ( token -- ? )
-    { [ til-eol-literal? ] [ delimiter>> "!" sequence= ] } 1&& ;
+    { [ line-comment-literal? ] [ delimiter>> "!" sequence= ] } 1&& ;
 
 : transform-single-line-comment>hash-comment ( token -- token' )
     dup single-line-comment? [
