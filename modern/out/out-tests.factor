@@ -1,6 +1,7 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors kernel modern modern.out sequences tools.test ;
+USING: accessors combinators.short-circuit kernel modern
+modern.out sequences tools.test ;
 IN: modern.out.tests
 
 : rewrite-same-string ( string -- ? )
@@ -25,5 +26,12 @@ IN: modern.out.tests
 
 { "^ foo  ^    bar" } [ "\\ foo  \\    bar" rename-backslash-delimiter ] unit-test
 
+{ ": asdf < '< > > ;" } [
+    ": asdf [ '[ ] ] ;" [
+        dup { [ single-literal? ] [ opening>> "[" = ] } 1&& [
+        [ drop "<" ] change-opening
+        ] when
+    ] rewrite-string
+] unit-test
 
 ! lexable-paths [ transform-single-line-comment>hash-comment ] rewrite-paths

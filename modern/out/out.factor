@@ -31,7 +31,7 @@ M: single-literal write-modern-literal
         [ tag>> write ]
         [ seq>> 1 swap nth write-whitespace ]
         [ opening>> write ]
-        [ [ seq>> 2 swap nth ] [ payload>> ] bi [ [ lexed-underlying write-whitespace ] [ lexed-underlying io:write ] bi* ] 2each ]
+        [ payload>> [ write-modern-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ seq>> 3 swap nth lexed-underlying write-whitespace ]
         [ opening>> matching-delimiter-string write ]
     } cleave ;
@@ -101,14 +101,21 @@ M: til-eol-literal write-modern-literal
 : write-modern-path ( seq path -- )
     utf8 [ write-modern-loop nl ] with-file-writer ; inline
 
+: map-literals ( obj quot: ( obj -- obj' ) -- seq )
+    over single-literal? [
+        [ call drop ] [ '[ [ _ map-literals ] map ] change-payload ] 2bi
+    ] [
+        call
+    ] if ; inline recursive
+
 : rewrite-path ( path quot -- )
     ! dup print
-    '[ [ path>literals _ map ] [ ] bi write-modern-path ]
+    '[ [ path>literals [ _ map-literals ] map ] [ ] bi write-modern-path ]
     [ drop . ] recover ; inline
 
 : rewrite-string ( string quot -- )
     ! dup print
-    [ string>literals ] dip map write-modern-string ; inline
+    [ string>literals ] dip '[ _ map-literals ] map write-modern-string ; inline
 
 : rewrite-paths ( seq quot -- ) '[ _ rewrite-path ] each ; inline
 : lexable-core-paths ( -- seq ) core-source-paths ;
