@@ -1,8 +1,9 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors arrays assocs combinators.smart continuations
-effects fry hashtables kernel make math math.parser modern
-namespaces sequences sequences.extras shuffle splitting strings ;
+USING: accessors arrays assocs combinators.short-circuit
+combinators.smart continuations effects fry hashtables kernel
+make math math.parser modern multiline namespaces sequences
+sequences.extras shuffle splitting strings vectors ;
 IN: modern.parser
 
 TUPLE: new-word name ;
@@ -15,7 +16,7 @@ TUPLE: existing-class name ;
 
 : token ( n seq -- n' seq token/f )
     2dup ?nth [
-        dup comment? [
+        dup til-eol-literal? [
             drop dip-inc token
         ] [
             [ dip-inc ] dip
@@ -35,6 +36,15 @@ DEFER: transform-literal
 DEFER: tokens-until
 : expect-tokens-until ( n seq str quot -- n seq obj )
     [ tokens-until drop ] dip check-expect ; inline
+
+: paren-literal? ( obj -- ? )
+    { [ single-match-literal? ] [ opening>> "(" = ] } 1&& ;
+
+: brace-literal? ( obj -- ? )
+    { [ single-match-literal? ] [ opening>> "{" = ] } 1&& ;
+
+: bracket-literal? ( obj -- ? )
+    { [ single-match-literal? ] [ opening>> "[" = ] } 1&& ;
 
 : expect-name ( n seq -- n seq slice ) [ slice? ] expect-token ;
 : expect-paren-literal ( n seq -- n seq slice ) [ paren-literal? ] expect-token ;
@@ -74,9 +84,17 @@ DEFER: tokens-until
     parse-vocabs values [ string? ] filter ;
 
 
+TUPLE: parser seq ;
+
+: push-seq ( parser obj -- parser )
+    over seq>> push ;
+
 TUPLE: array-brace obj ;
 TUPLE: hashtable-brace obj ;
-TUPLE: word-definition-colon obj array ;
+TUPLE: word-definition-parser obj array ;
+TUPLE: constant-parser < parser name value ;
+TUPLE: using-parser < parser names ;
+TUPLE: use-parser < parser name ;
 
 SYMBOL: brackets
 brackets [
@@ -98,19 +116,16 @@ parens [
     } clone
 ] initialize
 
-SYMBOL: colons
-colons [
-    H{
-        { "" word-definition-colon }
-    } clone
-] initialize
-
 SYMBOL: parsers
-parsers [
+! parsers [
     H{
-        ! { ":" word-definition-colon }
+        ! { ":" word-definition-parser }
+        { "CONSTANT:" constant-parser }
+        { "USING:" using-parser }
+        { "USE:" use-parser }
     } clone
-] initialize
+! ]
+parsers set-global
 
 ERROR: unknown-syntax obj tag ;
 
@@ -130,12 +145,13 @@ GENERIC: on-literal ( n string tuple -- n' string obj )
         ] if*
     ] loop>array 2nip ;
 
-M: slice transform-literal
-    dup string>number [
+M: tag-literal transform-literal
+    dup tag>> string>number [
     ] [
-        >string dup parsers get ?at [ new swap >>obj ] [ nip ] if
+        tag>> dup parsers get-global ?at [ new swap 1vector >>seq ] [ nip ] if
     ] ?if ;
 
+/*
 M: brace-literal transform-literal
     [ ] [ tag>> >string ] bi
     braces get ?at [ new swap >>obj ] [ unknown-syntax ] if ;
@@ -143,9 +159,9 @@ M: brace-literal transform-literal
 M: paren-literal transform-literal
     payload>>
     [ >string ] map { "--" } split1 <effect> ;
+*/
 
-
-M: word-definition-colon on-parse
+M: word-definition-parser on-parse
     [ [ new-word stack-effect body ] 2 output>array-n ] dip roll >>array ;
 
 
@@ -153,13 +169,15 @@ M: word-definition-colon on-parse
 
 M: number on-literal ;
 
+M: string on-literal ;
+
 M: array-brace on-literal
     obj>> payload>> [ transform-literal ] map ;
 
 M: hashtable-brace on-literal
     obj>> payload>> [ transform-literal ] map >hashtable ;
 
-M: word-definition-colon on-literal ;
+M: word-definition-parser on-literal ;
 
 
 ! constant:2 a 3
