@@ -7,58 +7,91 @@ modern.paths modern.slices namespaces prettyprint sequences sets
 splitting strings ;
 IN: modern.out
 
+SYMBOL: last-slice
+
 : write-whitespace ( obj -- )
-    lexed-underlying [ from>> ] [ seq>> ] bi
-    slice-while-whitespace-backwards io:write ;
+    [ last-slice get [ swap slice-between ] [ slice-before ] if* io:write ]
+    [ last-slice namespaces:set ] bi ;
 
 DEFER: write-modern-literal
-GENERIC: write-modern-literal* ( obj -- )
-M: object write-modern-literal* lexed-underlying write ;
-M: string write-modern-literal* write ;
-M: slice write-modern-literal*
-    [ write-whitespace ] [ write ] bi ;
+GENERIC: write-modern-literal ( obj -- )
+M: object write-modern-literal lexed-underlying write ;
+M: string write-modern-literal write ;
+M: slice write-modern-literal [ write-whitespace ] [ write ] bi ;
 
-M: token-literal write-modern-literal* payload>> write ;
-M: single-literal write-modern-literal*
+M: token-literal write-modern-literal
     {
-        [ tag>> write ]
-        [ opening>> write ]
-        [ payload>> [ write-modern-literal ] each ]
-        [
-            ! Use the underlying for position, but get the
-            ! matching-delimiter from the possible refactored tag
-            [ underlying>> 1 tail-slice* write-whitespace ]
-            [ opening>> matching-delimiter-string write ] bi
-        ]
+        [ seq>> 0 swap nth write-whitespace ]
+        [ payload>> write ]
     } cleave ;
 
-M: double-literal write-modern-literal*
+M: single-literal write-modern-literal
     {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> write ]
+        [ seq>> 1 swap nth write-whitespace ]
+        [ opening>> write ]
+        [ seq>> 2 swap nth write-whitespace ]
+        [ payload>> [ write-modern-literal ] each ]
+        [ seq>> 3 swap nth write-whitespace ]
+        [ opening>> matching-delimiter-string write ]
+    } cleave ;
+
+M: double-literal write-modern-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
         [ opening>> io:write ]
         [ payload>> io:write ]
         [ opening>> matching-delimiter-string io:write ]
     } cleave ;
 
-! M: string-literal write-modern-literal* drop ;
-! M: backtick-literal write-modern-literal* drop ;
-! M: backslash-literal write-modern-literal* drop ;
-M: til-eol-literal write-modern-literal* [ tag>> ] [ payload>> ] bi [ io:write ] bi@ ;
-! M: standalone-only-literal write-modern-literal* drop ;
+M: string-literal write-modern-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> io:write ]
+        [ opening>> io:write ]
+        [ payload>> io:write ]
+        [ opening>> matching-delimiter-string io:write ]
+    } cleave ;
 
-: write-modern-literal ( obj -- )
-    [ write-whitespace ] [ write-modern-literal* ] bi ;
+M: backtick-literal write-modern-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+        [ seq>> 2 swap nth write-whitespace ]
+        [ payload>> io:write ]
+    } cleave ;
+
+M: backslash-literal write-modern-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+        [ seq>> 2 swap nth write-whitespace ]
+        [ payload>> io:write ]
+    } cleave ;
+
+M: til-eol-literal write-modern-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> io:write ]
+        [ payload>> io:write ]
+    } cleave ;
 
 ! Swap in write-modern-literal for renaming
 
 : write-modern-loop ( quot -- )
-    [ write-modern-literal ] each nl ; inline
+    [ write-modern-literal ] each ; inline
 
 : write-modern-string ( seq -- string )
     [ write-modern-loop ] with-string-writer ; inline
 
 : write-modern-path ( seq path -- )
-    utf8 [ write-modern-loop ] with-file-writer ; inline
+    utf8 [ write-modern-loop nl ] with-file-writer ; inline
 
 : rewrite-path ( path quot -- )
     ! dup print

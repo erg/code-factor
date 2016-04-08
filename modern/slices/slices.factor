@@ -53,14 +53,6 @@ ERROR: unexpected-end n string ;
     n n' string ?<slice>
     ch ; inline
 
-:: slice-while-whitespace-backwards ( n string -- slice/f )
-    n 1 - string [ "\s\r\n" member? not ] find-last-from :> ( n' ch )
-    n' [
-        n' 1 + n string ?<slice>
-    ] [
-        0 n string ?<slice>
-    ] if ; inline
-
 :: slice-until-separator-inclusive ( n string tokens -- n' string slice/f ch/f )
     n string '[ tokens member? ] find-from [ dup [ 1 + ] when ] dip  :> ( n' ch )
     n' string

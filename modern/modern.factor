@@ -7,7 +7,7 @@ modern.slices multiline namespaces sequences sequences.extras
 sorting splitting strings unicode ;
 IN: modern
 
-TUPLE: lexed rule tag payload underlying ;
+TUPLE: lexed rule tag payload underlying seq ;
 TUPLE: matched-lexed < lexed opening closing ;
 
 TUPLE: compound-lexed sequence ;
@@ -17,17 +17,14 @@ TUPLE: matching-lexer delimiter ;           ! foo[ ] foo[[ ]] foo[lol[ ]lol]
 TUPLE: backtick-lexer delimiter ;           ! fixnum`3           ! has no space after
 TUPLE: backslash-lexer delimiter ;          ! word\ something    ! has a space after
 TUPLE: til-eol-lexer delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
-TUPLE: standalone-only-lexer delimiter ;    ! example:   ! comment   word!
 
 TUPLE: token-literal < lexed ;
 TUPLE: single-literal < matched-lexed ;
 TUPLE: double-literal < matched-lexed ;
 TUPLE: string-literal < matched-lexed ;
-TUPLE: backtick-literal < lexed ;
-TUPLE: backslash-literal < lexed ;
+TUPLE: backtick-literal < lexed delimiter ;
+TUPLE: backslash-literal < lexed delimiter ;
 TUPLE: til-eol-literal < lexed ;
-TUPLE: standalone-only-literal < lexed ;
-
 
 GENERIC: lexed-underlying ( obj -- slice )
 M: f lexed-underlying ;
@@ -57,11 +54,18 @@ ERROR: string-expected-got-eof n string ;
         tag >>tag
         payload >>payload
         tag last [ dup token-literal? [ lexed-underlying ] when ] bi@
-        span-slices >>underlying ; inline
+        span-slices >>underlying
+        tag payload last 3array >>seq ; inline
+
+:: make-delimited-literal ( payload last tag delimiter class -- literal )
+    payload last tag class make-literal
+        delimiter >>delimiter
+        tag delimiter payload 3array >>seq ; inline
 
 :: make-matched-literal ( payload closing tag opening class -- literal )
     payload closing tag class make-literal
-        opening >>opening ; inline
+        opening >>opening
+        tag opening payload closing 4array >>seq ; inline
 
 ERROR: long-opening-mismatch tag open n string ch ;
 
@@ -142,7 +146,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
     [
         slice-until-whitespace drop
         dup
-    ] dip backtick-literal make-literal ;
+    ] dip 1 cut-slice* backtick-literal make-delimited-literal ;
 
 : read-string-payload ( n string -- n' string )
     over [
@@ -161,7 +165,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
     n' [ n string string-expected-got-eof ] unless
     n n' 1 - string <slice>
     n' 1 - n' string <slice>
-    tag string-literal make-literal ;
+    tag 1 cut-slice* string-literal make-matched-literal ;
 
 : take-comment ( n string slice -- n' string comment )
     2over ?nth CHAR: [ = [
@@ -178,11 +182,11 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
 ERROR: backslash-expects-whitespace slice ;
 : read-backslash ( n string slice -- n' string obj )
     2over peek-from blank? [
-        ! M\
-        [ skip-blank-from slice-until-whitespace drop dup ] dip backslash-literal make-literal
+        ! \ foo, M\ foo
+        [ skip-blank-from slice-until-whitespace drop dup ] dip 1 cut-slice* backslash-literal make-delimited-literal
     ] [
         ! M\N
-        [ merge-slice-until-whitespace dup ] keep backslash-literal make-literal
+        [ merge-slice-until-whitespace dup ] keep token-literal make-literal
     ] if ;
 
 ! If the slice is 0 width, we stopped on whitespace.
@@ -194,7 +198,6 @@ ERROR: backslash-expects-whitespace slice ;
 
 CONSTANT: factor-lexing-rules {
     T{ til-eol-lexer f CHAR: ! }
-    ! T{ standalone-or-word-lexer f CHAR: # }
     T{ backslash-lexer f CHAR: \ }
     T{ backtick-lexer f CHAR: ` }
     T{ string-lexer f CHAR: " CHAR: \ }
