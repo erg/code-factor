@@ -28,9 +28,8 @@ IN: modern.out.tests
 
 { ": asdf < '< > > ;" } [
     ": asdf [ '[ ] ] ;" [
-        dup { [ single-matched-literal? ] [ delimiter>> "[" = ] } 1&& [
-        [ drop "<" ] change-delimiter
-        ] when
+        dup { [ single-matched-literal? ] [ delimiter>> "[" = ] } 1&&
+        [ [ drop "<" ] change-delimiter ] when
     ] rewrite-string
 ] unit-test
 
