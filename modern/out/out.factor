@@ -3,8 +3,8 @@
 USING: accessors combinators combinators.short-circuit
 combinators.smart continuations fry io io.encodings.string
 io.encodings.utf8 io.files io.streams.string kernel modern
-modern.paths modern.slices namespaces prettyprint sequences sets
-splitting strings ;
+modern.paths modern.slices multiline namespaces prettyprint
+sequences sets splitting strings ;
 IN: modern.out
 
 SYMBOL: last-slice
@@ -211,6 +211,18 @@ M: til-eol-literal write-modern-literal
         "resource:extra/trees/splay/splay.factor"
         "resource:extra/yaml/conversion/conversion.factor"
     } diff ;
+
+/*
+! These work except they use pegs/ebnf, grep for [[ ]]
+	modified:   basis/db/sqlite/errors/errors.factor
+	modified:   basis/formatting/formatting.factor
+	modified:   basis/globs/globs.factor
+	modified:   extra/alien/fortran/fortran.factor
+	modified:   extra/cpu/8080/emulator/emulator.factor
+	modified:   extra/peg/expr/expr.factor
+	modified:   extra/rosetta-code/arithmetic-evaluation/arithmetic-evaluation.factor
+	modified:   extra/shell/parser/parser.factor
+*/
 
 : lexable-paths ( -- seq )
     [
