@@ -7,11 +7,11 @@ modern.slices multiline namespaces sequences sequences.extras
 sorting splitting strings unicode ;
 IN: modern
 
-TUPLE: string-lexer delimiter escape ;      ! url"lol.com"  abcddf\aa  [ 1 2 3 ]
-TUPLE: matching-lexer delimiter ;           ! foo[ ] foo[[ ]] foo[lol[ ]lol]
-TUPLE: backtick-lexer delimiter ;           ! fixnum`3           ! has no space after
-TUPLE: backslash-lexer delimiter ;          ! word\ something    ! has a space after
-TUPLE: til-eol-lexer delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
+TUPLE: string-lexer handler delimiter escape ;      ! url"lol.com"  abcddf\aa  [ 1 2 3 ]
+TUPLE: matching-lexer handler delimiter ;           ! foo[ ] foo[[ ]] foo[lol[ ]lol]
+TUPLE: backtick-lexer handler delimiter ;           ! fixnum`3           ! has no space after
+TUPLE: backslash-lexer handler delimiter ;          ! word\ something    ! has a space after
+TUPLE: til-eol-lexer handler delimiter ;            ! TODO# Fix the lexer, TODO#[==[omg]==]
 
 TUPLE: literal underlying seq ;
 TUPLE: tag-literal < literal tag ;
@@ -208,15 +208,6 @@ ERROR: backslash-expects-whitespace slice ;
     [ drop [ 1 + ] dip lex ]
     [ make-tag-literal ] if ;
 
-CONSTANT: factor-lexing-rules {
-    T{ til-eol-lexer f CHAR: ! }
-    T{ backslash-lexer f CHAR: \ }
-    T{ backtick-lexer f CHAR: ` }
-    T{ string-lexer f CHAR: " CHAR: \ }
-    T{ matching-lexer f CHAR: [ }
-    T{ matching-lexer f CHAR: { }
-    T{ matching-lexer f CHAR: ( }
-}
 
 SYMBOL: lexing-delimiters
 
@@ -233,23 +224,31 @@ SYMBOL: lexing-delimiters
     keys natural-sort "\r\n " "" append-as ;
 
 : lex ( n/f string -- n'/f string literal )
-    over [
-        "!`([{\"\s\r\n\\" slice-until-either {
-            { CHAR: ! [ read-exclamation ] }
-            { CHAR: ` [ read-backtick ] }
-            { CHAR: \ [ read-backslash ] }
-            { CHAR: " [ read-string ] }
-            { CHAR: [ [ read-bracket ] }
-            { CHAR: { [ read-brace ] }
-            { CHAR: ( [ read-paren ] }
-            { CHAR: \s [ read-token-or-whitespace ] }
-            { CHAR: \r [ read-token-or-whitespace ] }
-            { CHAR: \n [ read-token-or-whitespace ] }
-            { f [ f like dup [ make-tag-literal ] when ] }
-        } case
-    ] [
-        f
-    ] if ; inline recursive
+    "!`([{\"\s\r\n\\" slice-until-either {
+        { CHAR: ! [ read-exclamation ] }
+        { CHAR: ` [ read-backtick ] }
+        { CHAR: \ [ read-backslash ] }
+        { CHAR: " [ read-string ] }
+        { CHAR: [ [ read-bracket ] }
+        { CHAR: { [ read-brace ] }
+        { CHAR: ( [ read-paren ] }
+        { CHAR: \s [ read-token-or-whitespace ] }
+        { CHAR: \r [ read-token-or-whitespace ] }
+        { CHAR: \n [ read-token-or-whitespace ] }
+        { f [ f like dup [ make-tag-literal ] when ] }
+    } case ; inline recursive
+
+! MACRO: make-lexer ( seq -- quot )  ;
+
+CONSTANT: factor-lexing-rules {
+    T{ til-eol-lexer f read-exclamation CHAR: ! }
+    T{ backtick-lexer f read-backtick CHAR: ` }
+    T{ backslash-lexer f read-backslash CHAR: \ }
+    T{ string-lexer f read-string CHAR: " CHAR: \ }
+    T{ matching-lexer f read-bracket CHAR: [ }
+    T{ matching-lexer f read-brace CHAR: { }
+    T{ matching-lexer f read-paren CHAR: ( }
+}
 
 : string>literals ( string -- sequence )
     [ 0 ] dip [ lex ] loop>array 2nip ;
