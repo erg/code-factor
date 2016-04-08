@@ -1,10 +1,10 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors combinators combinators.short-circuit
-combinators.smart continuations fry io io.encodings.string
-io.encodings.utf8 io.files io.streams.string kernel modern
-modern.paths modern.slices multiline namespaces prettyprint
-sequences sets splitting strings ;
+combinators.smart continuations fry io io.encodings.utf8
+io.files io.streams.string kernel modern modern.paths
+modern.slices multiline namespaces prettyprint sequences sets
+splitting strings ;
 IN: modern.out
 
 SYMBOL: last-slice
@@ -13,30 +13,30 @@ SYMBOL: last-slice
     [ last-slice get [ swap slice-between ] [ slice-before ] if* io:write ]
     [ last-slice namespaces:set ] bi ;
 
-DEFER: write-modern-literal
-GENERIC: write-modern-literal ( obj -- )
-M: object write-modern-literal lexed-underlying write ;
-M: string write-modern-literal write ;
-M: slice write-modern-literal [ write-whitespace ] [ write ] bi ;
+DEFER: write-literal
+GENERIC: write-literal ( obj -- )
+M: object write-literal lexed-underlying write ;
+M: string write-literal write ;
+M: slice write-literal [ write-whitespace ] [ write ] bi ;
 
-M: tag-literal write-modern-literal
+M: tag-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> write ]
     } cleave ;
 
-M: single-literal write-modern-literal
+M: single-match-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> write ]
         [ seq>> 1 swap nth write-whitespace ]
         [ opening>> write ]
-        [ payload>> [ write-modern-literal ] each ] ! don't need write-whitespace here, the recursion does it
+        [ payload>> [ write-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ seq>> 3 swap nth lexed-underlying write-whitespace ]
         [ opening>> matching-delimiter-string write ]
     } cleave ;
 
-M: double-literal write-modern-literal
+M: double-match-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -48,7 +48,7 @@ M: double-literal write-modern-literal
         [ opening>> matching-delimiter-string io:write ]
     } cleave ;
 
-M: string-literal write-modern-literal
+M: string-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -60,7 +60,7 @@ M: string-literal write-modern-literal
         [ opening>> matching-delimiter-string io:write ]
     } cleave ;
 
-M: backtick-literal write-modern-literal
+M: backtick-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -70,7 +70,7 @@ M: backtick-literal write-modern-literal
         [ payload>> io:write ]
     } cleave ;
 
-M: backslash-literal write-modern-literal
+M: backslash-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -80,7 +80,7 @@ M: backslash-literal write-modern-literal
         [ payload>> io:write ]
     } cleave ;
 
-M: til-eol-literal write-modern-literal
+M: til-eol-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
@@ -90,10 +90,10 @@ M: til-eol-literal write-modern-literal
         [ payload>> io:write ]
     } cleave ;
 
-! Swap in write-modern-literal for renaming
+! Swap in write-literal for renaming
 
 : write-modern-loop ( quot -- )
-    [ write-modern-literal ] each ; inline
+    [ write-literal ] each ; inline
 
 : write-modern-string ( seq -- string )
     [ write-modern-loop ] with-string-writer ; inline
@@ -102,7 +102,7 @@ M: til-eol-literal write-modern-literal
     utf8 [ write-modern-loop nl ] with-file-writer ; inline
 
 : map-literals ( obj quot: ( obj -- obj' ) -- seq )
-    over single-literal? [
+    over single-match-literal? [
         [ call drop ] [ '[ [ _ map-literals ] map ] change-payload ] 2bi
     ] [
         call

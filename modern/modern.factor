@@ -20,8 +20,8 @@ TUPLE: tag-matched-literal < literal tag opening payload closing ;
 
 TUPLE: compound-literal sequence ;
 
-TUPLE: single-literal < tag-matched-literal ;
-TUPLE: double-literal < tag-matched-literal ;
+TUPLE: single-match-literal < tag-matched-literal ;
+TUPLE: double-match-literal < tag-matched-literal ;
 TUPLE: string-literal < tag-matched-literal ;
 TUPLE: backtick-literal < tag-delimiter-payload-literal  ;
 TUPLE: backslash-literal < tag-delimiter-payload-literal ;
@@ -36,9 +36,9 @@ ERROR: unknown-literal ch ;
 <<
 : lookup-literal ( ch -- literal )
     H{
-        { CHAR: [ single-literal }
-        { CHAR: { single-literal }
-        { CHAR: ( single-literal }
+        { CHAR: [ single-match-literal }
+        { CHAR: { single-match-literal }
+        { CHAR: ( single-match-literal }
         { CHAR: " string-literal }
         { CHAR: ` backtick-literal }
         { CHAR: \ backslash-literal }
@@ -97,13 +97,13 @@ MACRO:: read-long ( open-ch -- quot: ( n string tag ch -- n' string seq ) )
 
                 n' string' needle slice-until-string :> ( n'' string'' payload closing )
                 n'' string
-                payload closing tag opening double-literal make-tag-matched-literal
+                payload closing tag opening double-match-literal make-tag-matched-literal
             ] }
             { open-ch [
                 tag 1 cut-slice* swap tag! 1 modify-to :> opening
                 n 1 + string closestr2 slice-until-string :> ( n' string' payload closing )
                 n' string
-                payload closing tag opening double-literal make-tag-matched-literal
+                payload closing tag opening double-match-literal make-tag-matched-literal
             ] }
             [ [ tag openstr2 n string ] dip long-opening-mismatch ]
         } case
@@ -145,7 +145,7 @@ MACRO:: read-matching ( ch -- quot: ( n string tag -- n' string slice' ) )
         n string tag
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-long ] } ! (=( or ((
-            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-literal make-tag-matched-literal ] } ! ( foo )
+            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-match-literal make-tag-matched-literal ] } ! ( foo )
             [ drop [ slice-until-whitespace drop ] dip span-slices make-tag-literal ]  ! (foo)
         } cond
     ] ;

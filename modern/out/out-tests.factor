@@ -20,6 +20,7 @@ IN: modern.out.tests
 { t } [ "fixnum`33 ch`@" rewrite-same-string ] unit-test
 { t } [ "! omg" rewrite-same-string ] unit-test
 { t } [ "todo! omg" rewrite-same-string ] unit-test
+{ t } [ "foo[ bar{ baz( ) } ]" rewrite-same-string ] unit-test
 
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 
@@ -28,7 +29,7 @@ IN: modern.out.tests
 
 { ": asdf < '< > > ;" } [
     ": asdf [ '[ ] ] ;" [
-        dup { [ single-literal? ] [ opening>> "[" = ] } 1&& [
+        dup { [ single-match-literal? ] [ opening>> "[" = ] } 1&& [
         [ drop "<" ] change-opening
         ] when
     ] rewrite-string
