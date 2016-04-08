@@ -17,6 +17,9 @@ IN: modern.out.tests
     ] rewrite-string ;
 
 { t } [ "fixnum`33 ch`@" rewrite-same-string ] unit-test
+{ t } [ "! omg" rewrite-same-string ] unit-test
+{ t } [ "todo! omg" rewrite-same-string ] unit-test
+
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 
 

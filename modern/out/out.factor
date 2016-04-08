@@ -19,10 +19,10 @@ M: object write-modern-literal lexed-underlying write ;
 M: string write-modern-literal write ;
 M: slice write-modern-literal [ write-whitespace ] [ write ] bi ;
 
-M: token-literal write-modern-literal
+M: tag-literal write-modern-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
-        [ payload>> write ]
+        [ tag>> write ]
     } cleave ;
 
 M: single-literal write-modern-literal
@@ -79,6 +79,9 @@ M: til-eol-literal write-modern-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+        [ seq>> 2 swap nth write-whitespace ]
         [ payload>> io:write ]
     } cleave ;
 
@@ -218,7 +221,7 @@ M: til-eol-literal write-modern-literal
     { [ "(" head? ] [ ")" tail? ] } 1&& ;
 
 : transform-paren-word>tick-word ( token -- token' )
-    dup { [ token-literal? ] [ payload>> paren-word-name? ] } 1&& [
+    dup { [ tag-literal? ] [ payload>> paren-word-name? ] } 1&& [
         [ paren-word>tick-word ] change-payload
     ] when ;
 
