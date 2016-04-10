@@ -33,10 +33,10 @@ TUPLE: exact-tag-literal < tag-literal ;
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
+TUPLE: colon-literal < matched-literal semi ;
 TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
 TUPLE: semicolon-literal < delimited-literal ;
-TUPLE: colon-literal < delimited-literal semi ;
 TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: whitespace-literal < tag-literal ;
 
