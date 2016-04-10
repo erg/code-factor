@@ -31,7 +31,7 @@ TUPLE: delimited-literal < tag-literal delimiter payload ;
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
-TUPLE: uppercase-colon-literal < matched-literal semi ;
+TUPLE: uppercase-colon-literal < matched-literal ;
 TUPLE: lowercase-colon-literal < delimited-literal ;
 TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
@@ -84,15 +84,6 @@ ERROR: string-expected-got-eof n string ;
         tag >string >>tag
         payload >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
-        opening >string >>delimiter
-        tag opening payload closing 4array >>seq ; inline
-
-:: make-colon-matched-literal ( semi payload closing tag opening class -- literal )
-    class new
-        tag >string >>tag
-        payload >>payload
-        semi >>semi
-        tag semi [ dup slice? [ lexed-underlying ] unless ] bi@ ?span-slices >>underlying
         opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
 
@@ -275,7 +266,7 @@ SYMBOL: lexing-delimiters
     [ [ delimiter>> ] [ generator>> 1quotation ] bi ] { } map>assoc ;
 >>
 
-MACRO: make-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
+MACRO: rules>call-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
     [ lexer-rules>delimiters ]
     [
         lexer-rules>assoc
@@ -305,7 +296,7 @@ CONSTANT: factor-lexing-rules {
 }
 
 : lex-factor ( n/f string -- n'/f string literal )
-    factor-lexing-rules make-lexer ;
+    factor-lexing-rules rules>call-lexer ;
 
 : string>literals ( string -- sequence )
     [ 0 ] dip [ lex-factor ] loop>array 2nip ;
