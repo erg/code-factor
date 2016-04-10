@@ -15,7 +15,7 @@ SYMBOL: last-slice
 
 DEFER: write-literal
 GENERIC: write-literal ( obj -- )
-M: object write-literal lexed-underlying write ;
+! M: object write-literal lexed-underlying write ;
 M: string write-literal write ;
 M: slice write-literal [ write-whitespace ] [ write ] bi ;
 
@@ -259,3 +259,6 @@ M: line-comment-literal write-literal
 
 : transform-source ( quot -- )
     lexable-paths swap rewrite-paths ; inline
+
+: transform-core ( quot -- )
+    lexable-core-paths swap rewrite-paths ; inline

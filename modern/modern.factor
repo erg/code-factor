@@ -19,6 +19,8 @@ TUPLE: matched-lexer < lexer-with-sublexers delimiter double-char ; ! ``close`` 
 TUPLE: backtick-lexer < lexer delimiter ;
 TUPLE: backslash-lexer < lexer delimiter payload-exception? ; ! payload-exception is \n words
 TUPLE: line-comment-lexer < lexer delimiter word-name-exception? ; ! escape-newline-exception? (like C)
+TUPLE: colon-lexer < lexer delimiter ;
+TUPLE: semicolon-lexer < lexer delimiter ; ! ; inline foldable
 TUPLE: whitespace-lexer < lexer delimiter ; ! \s \r \n \t?
 
 ! Base lexer result
@@ -33,6 +35,8 @@ TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
 TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
+TUPLE: semicolon-literal < delimited-literal ;
+TUPLE: colon-literal < delimited-literal semi ;
 TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: whitespace-literal < tag-literal ;
 
@@ -58,14 +62,14 @@ ERROR: string-expected-got-eof n string ;
     class new
         tag >string >>tag
         payload >string >>payload
-        tag last [ dup tag-literal? [ lexed-underlying ] when ] bi@ span-slices >>underlying
+        tag last [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         tag payload 2array >>seq ; inline
 
 :: make-delimited-literal ( payload last tag delimiter class -- literal )
     class new
         tag >string >>tag
         payload >string >>payload
-        tag last [ dup tag-literal? [ lexed-underlying ] when ] bi@ span-slices >>underlying
+        tag last [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         delimiter >string >>delimiter
         tag delimiter payload 3array >>seq ; inline
 
@@ -73,7 +77,16 @@ ERROR: string-expected-got-eof n string ;
     class new
         tag >string >>tag
         payload >>payload
-        tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ span-slices >>underlying
+        tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
+        opening >string >>delimiter
+        tag opening payload closing 4array >>seq ; inline
+
+:: make-colon-matched-literal ( semi payload closing tag opening class -- literal )
+    class new
+        tag >string >>tag
+        payload >>payload
+        semi >>semi
+        tag semi [ dup slice? [ lexed-underlying ] unless ] bi@ ?span-slices >>underlying
         opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
 
@@ -89,17 +102,17 @@ MACRO:: read-double-matched ( open-ch -- quot: ( n string tag ch -- n' string se
     [| n string tag! ch |
         ch {
             { CHAR: = [
-                n string openstr1 slice-until-separator-inclusive [ -1 modify-from ] dip :> ( n' string' opening ch )
+                n string openstr1 slice-til-separator-inclusive [ -1 modify-from ] dip :> ( n' string' opening ch )
                 ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ] unless
                 opening matching-delimiter-string :> needle
 
-                n' string' needle slice-until-string :> ( n'' string'' payload closing )
+                n' string' needle slice-til-string :> ( n'' string'' payload closing )
                 n'' string
                 payload closing tag opening double-matched-literal make-matched-literal
             ] }
             { open-ch [
                 tag 1 cut-slice* swap tag! 1 modify-to :> opening
-                n 1 + string closestr2 slice-until-string :> ( n' string' payload closing )
+                n 1 + string closestr2 slice-til-string :> ( n' string' payload closing )
                 n' string
                 payload closing tag opening double-matched-literal make-matched-literal
             ] }
@@ -123,7 +136,7 @@ ERROR: lex-expected-but-got-eof n string expected ;
                     dup tag-literal? [
                         underlying>> _ sequence= not
                     ] [
-                        drop t  ! loop again?
+                        drop t ! loop again?
                     ] if
                 ] [
                     _ _ _ lex-expected-but-got-eof
@@ -144,7 +157,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-double-matched ] } ! (=( or ((
             { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-matched-literal make-matched-literal ] } ! ( foo )
-            [ drop [ slice-until-whitespace drop ] dip span-slices make-tag-literal ]  ! (foo)
+            [ drop [ slice-til-whitespace drop ] dip span-slices make-tag-literal ]  ! (foo)
         } cond
     ] ;
 
@@ -154,13 +167,13 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 : read-backtick ( n string opening -- n' string obj )
     [
-        slice-until-whitespace drop
+        slice-til-whitespace drop
         dup
     ] dip 1 cut-slice* backtick-literal make-delimited-literal ;
 
 : read-string-payload ( n string -- n' string )
     over [
-        { CHAR: \ CHAR: " } slice-until-separator-inclusive {
+        { CHAR: \ CHAR: " } slice-til-separator-inclusive {
             { f [ drop ] }
             { CHAR: " [ drop ] }
             { CHAR: \ [ drop next-char-from drop read-string-payload ] }
@@ -184,19 +197,56 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         [ slice-til-eol-from drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
     ] if ;
 
+ERROR: whitespace-required-before-semicolon n string slice ;
+: read-semicolon ( n string slice -- n' string semi )
+    dup length 1 > [
+        whitespace-required-before-semicolon
+    ] [
+      2over next-char-from* {
+            { CHAR: \r [ ] } ! done
+            { CHAR: \n [ ] }
+            { f [ [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ] } ! done
+            { CHAR: \s [ [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ] }
+            [ drop [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ]  ! ;ebnf inline
+        } case
+    ] if ;
+
+: read-til-semicolon ( n string slice -- n' string semi )
+    [ ";" lex-until '[ [ _ lexed-underlying read-semicolon ] dip ] keep ] dip
+    1 cut-slice* colon-literal make-colon-matched-literal ;
+
+: read-word-or-til-semicolon ( n string slice -- n' string obj )
+    2over next-char-from* "\s\r\n" member? [
+        read-til-semicolon
+    ] [
+        merge-slice-til-whitespace make-tag-literal
+    ] if ;
+
+ERROR: colon-word-must-be-all-uppercase-or-lowercase word ;
+: read-colon ( n string slice -- n' string colon )
+    dup length 1 = [
+        read-word-or-til-semicolon
+    ] [
+        {
+            ! { [ dup lower? ] [ [ lex-factor ] dip ] }
+            { [ dup upper? ] [ read-til-semicolon ] }
+            [ ]
+        } cond
+    ] if ;
+
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
     dup { [ "!" sequence= ] [ "#!" sequence= ] } 1||
-    [ take-comment ] [ merge-slice-until-whitespace make-tag-literal ] if ;
+    [ take-comment ] [ merge-slice-til-whitespace make-tag-literal ] if ;
 
 ERROR: backslash-expects-whitespace slice ;
 : read-backslash ( n string slice -- n' string obj )
     2over peek-from blank? [
         ! \ foo, M\ foo
-        [ skip-blank-from slice-until-whitespace drop dup ] dip 1 cut-slice* backslash-literal make-delimited-literal
+        [ skip-blank-from slice-til-whitespace drop dup ] dip 1 cut-slice* backslash-literal make-delimited-literal
     ] [
         ! M\N
-        merge-slice-until-whitespace make-tag-literal
+        merge-slice-til-whitespace make-tag-literal
     ] if ;
 
 ! If the slice is 0 width, we stopped on whitespace.
@@ -205,13 +255,6 @@ ERROR: backslash-expects-whitespace slice ;
     dup length 0 =
     [ drop [ 1 + ] dip lex-factor ]
     [ make-tag-literal ] if ;
-
-! MACRO:: make-read-token-or-whitespace ( lex -- quot: ( n string slice -- n' string slice ) )
-!     [
-!        dup length 0 =
-!        [ drop [ 1 + ] dip lex ]
-!        [ make-tag-literal ] if ;
-!    ] ;
 
 SYMBOL: lexing-delimiters
 
@@ -238,13 +281,15 @@ MACRO: make-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
         lexer-rules>assoc
         { f [ f like dup [ make-tag-literal ] when ] } suffix
     ] bi
-    '[ _ slice-until-either _ case ] ;
+    '[ _ slice-til-either _ case ] ;
 
 CONSTANT: factor-lexing-rules {
     T{ line-comment-lexer { generator read-exclamation } { delimiter CHAR: ! } }
     T{ backtick-lexer { generator read-backtick } { delimiter CHAR: ` } }
     T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
     T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
+    T{ colon-lexer { generator read-colon } { delimiter CHAR: : } }
+    ! T{ semicolon-lexer { generator read-semicolon } { delimiter CHAR: ; } }
     T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
     T{ matched-lexer { generator read-brace } { delimiter CHAR: { } }
     T{ matched-lexer { generator read-paren } { delimiter CHAR: ( } }
@@ -276,7 +321,7 @@ CONSTANT: factor-lexing-rules {
 /*
 ! What a lexer body looks like, produced by make-lexer
 : lex ( n/f string -- n'/f string literal )
-    "!`\\\"[{(\s\r\n" slice-until-either {
+    "!`\\\"[{(\s\r\n" slice-til-either {
         { CHAR: ! [ read-exclamation ] }
         { CHAR: ` [ read-backtick ] }
         { CHAR: \ [ read-backslash ] }

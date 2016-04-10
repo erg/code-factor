@@ -30,6 +30,9 @@ ERROR: unexpected-end n string ;
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
+: next-char-from* ( n/f string -- ch/f )
+    next-char-from 2nip ;
+
 : find-from* ( ... n seq quot: ( ... elt -- ... ? ) -- ... i elt ? )
     [ find-from ] keep
     pick [ drop t ] [ length -rot nip f ] if ; inline
@@ -47,24 +50,37 @@ ERROR: unexpected-end n string ;
     ch ; inline
 
 ! Don't include the whitespace in the slice
-:: slice-until-whitespace ( n string -- n' string slice/f ch/f )
+:: slice-til-whitespace ( n string -- n' string slice/f ch/f )
     n string '[ "\s\r\n" member? ] find-from :> ( n' ch )
     n' string
     n n' string ?<slice>
     ch ; inline
 
-:: slice-until-separator-inclusive ( n string tokens -- n' string slice/f ch/f )
+: empty-slice-end ( seq -- slice )
+    [ length dup ] [ ] bi <slice> ;
+
+:: slice-til-eol ( n string -- n' string slice/f ch/f )
+    n [
+        n string '[ "\r\n" member? ] find-from :> ( n' ch )
+        n' string
+        n n' string ?<slice>
+        ch
+    ] [
+        n string string empty-slice-end f
+    ] if ; inline
+
+:: slice-til-separator-inclusive ( n string tokens -- n' string slice/f ch/f )
     n string '[ tokens member? ] find-from [ dup [ 1 + ] when ] dip  :> ( n' ch )
     n' string
     n n' string ?<slice>
     ch ; inline
 
-: slice-until-separator-exclusive ( n string tokens -- n' string slice/f ch/f )
-    slice-until-separator-inclusive dup [
+: slice-til-separator-exclusive ( n string tokens -- n' string slice/f ch/f )
+    slice-til-separator-inclusive dup [
         [ [ 1 - ] change-to ] dip
     ] when ;
 
-:: slice-until-either ( n string tokens -- n'/f string slice/f ch )
+:: slice-til-either ( n string tokens -- n'/f string slice/f ch )
     n [
         n string '[ tokens member? ] find-from
         dup "\s\r\n" member? [
@@ -89,7 +105,7 @@ ERROR: unexpected-end n string ;
         [ whitespace-expected-after ] if
     ] when* ;
 
-:: slice-until-string ( n string search --  n' string payload end-string )
+:: slice-til-string ( n string search --  n' string payload end-string )
     search string n start* :> n'
     n' [ n string search subseq-expected-but-got-eof ] unless
     n' search length +  string
@@ -111,8 +127,11 @@ ERROR: unexpected-end n string ;
         -1 modify-to [ 1 - ] 2dip
     ] unless ;
 
-: merge-slice-until-whitespace ( n string slice --  n' string slice' )
-    [ slice-until-whitespace drop ] dip merge-slices ;
+: merge-slice-til-whitespace ( n string slice --  n' string slice' )
+    [ slice-til-whitespace drop ] dip merge-slices ;
+
+: merge-slice-til-eol ( n string slice --  n' string slice' )
+    [ slice-til-eol drop ] dip merge-slices ;
 
 : slice-between ( slice1 slice2 -- slice )
     ! ensure-same-underlying
