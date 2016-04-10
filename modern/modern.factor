@@ -198,23 +198,9 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         [ slice-til-eol-from drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
     ] if ;
 
-ERROR: whitespace-required-before-semicolon n string slice ;
-: read-semicolon ( n string slice -- n' string semi )
-    dup length 1 > [
-        whitespace-required-before-semicolon
-    ] [
-      2over next-char-from* {
-            { CHAR: \r [ ] } ! done
-            { CHAR: \n [ ] }
-            { f [ [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ] } ! done
-            { CHAR: \s [ [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ] }
-            [ drop [ slice-til-eol drop dup ] dip 1 cut-slice* semicolon-literal make-delimited-literal ]  ! ;ebnf inline
-        } case
-    ] if ;
-
 : read-til-semicolon ( n string slice -- n' string semi )
-    [ ";" lex-until '[ [ _ lexed-underlying read-semicolon ] dip ] keep ] dip
-    1 cut-slice* uppercase-colon-literal make-colon-matched-literal ;
+    [ ";" lex-until ] dip
+    1 cut-slice* uppercase-colon-literal make-matched-literal ;
 
 : read-word-or-til-semicolon ( n string slice -- n' string obj )
     2over next-char-from* "\s\r\n" member? [
@@ -223,7 +209,7 @@ ERROR: whitespace-required-before-semicolon n string slice ;
         merge-slice-til-whitespace make-tag-literal
     ] if ;
 
-ERROR: colon-word-must-be-all-uppercase-or-lowercase word ;
+ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
     dup length 1 = [
         read-word-or-til-semicolon
@@ -231,7 +217,7 @@ ERROR: colon-word-must-be-all-uppercase-or-lowercase word ;
         {
             { [ dup lower? ] [ [ lex-factor dup ] dip 1 cut-slice* lowercase-colon-literal make-delimited-literal ] }
             { [ dup upper? ] [ read-til-semicolon ] }
-            [ ]
+            [ colon-word-must-be-all-uppercase-or-lowercase ]
         } cond
     ] if ;
 
@@ -290,7 +276,6 @@ CONSTANT: factor-lexing-rules {
     T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
     T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
     T{ colon-lexer { generator read-colon } { delimiter CHAR: : } }
-    ! T{ semicolon-lexer { generator read-semicolon } { delimiter CHAR: ; } }
     T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
     T{ matched-lexer { generator read-brace } { delimiter CHAR: { } }
     T{ matched-lexer { generator read-paren } { delimiter CHAR: ( } }

@@ -90,16 +90,6 @@ M: line-comment-literal write-literal
         [ payload>> io:write ]
     } cleave ;
 
-M: semicolon-literal write-literal
-    {
-        [ seq>> 0 swap nth write-whitespace ]
-        [ tag>> io:write ]
-        [ seq>> 1 swap nth write-whitespace ]
-        [ delimiter>> io:write ]
-        [ seq>> 2 swap nth write-whitespace ]
-        [ payload>> io:write ]
-    } cleave ;
-
 M: uppercase-colon-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
