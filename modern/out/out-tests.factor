@@ -1,7 +1,7 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors combinators.short-circuit kernel modern
-modern.out sequences tools.test ;
+modern.out sequences tools.test multiline ;
 IN: modern.out.tests
 
 : rewrite-same-string ( string -- ? )
@@ -22,15 +22,22 @@ IN: modern.out.tests
 { t } [ "todo! omg" rewrite-same-string ] unit-test
 { t } [ "foo[ bar{ baz( ) } ]" rewrite-same-string ] unit-test
 
+{ t } [ " array: 1" rewrite-same-string ] unit-test
+{ t } [ " ARRAY: ;" rewrite-same-string ] unit-test
+{ t } [ " ARRAY: 1 ;{ inline }" rewrite-same-string ] unit-test
+{ t } [ " ARRAY: 1 ;[ 0 ]" rewrite-same-string ] unit-test
+
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 
 { "^ foo  ^    bar" } [ "\\ foo  \\    bar" rename-backslash-delimiter ] unit-test
 
+/*
 { ": asdf < '< > > ;" } [
     ": asdf [ '[ ] ] ;" [
         dup { [ single-matched-literal? ] [ delimiter>> "[" = ] } 1&&
         [ [ drop "<" ] change-delimiter ] when
     ] rewrite-string
 ] unit-test
+*/
 
 ! lexable-paths [ transform-single-line-comment>hash-comment ] rewrite-paths
