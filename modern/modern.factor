@@ -1,10 +1,11 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays assocs assocs.extras combinators
-combinators.short-circuit continuations fry io.encodings.utf8
-io.files kernel locals macros make math modern.paths
-modern.slices multiline namespaces quotations sequences
-sequences.extras sorting splitting strings unicode ;
+combinators.short-circuit constructors continuations fry
+io.encodings.utf8 io.files kernel locals macros make math
+modern.paths modern.slices multiline namespaces quotations
+sequences sequences.extras sorting splitting splitting.monotonic
+strings unicode ;
 IN: modern
 
 ! Base rules, everything should have a generator macro
@@ -40,12 +41,19 @@ TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: terminator-literal < tag-literal ;
 TUPLE: whitespace-literal < tag-literal ;
 
-TUPLE: compound-literal sequence ;
-
 GENERIC: lexed-underlying ( obj -- slice )
 M: f lexed-underlying ;
 M: object lexed-underlying underlying>> ;
 M: slice lexed-underlying ;
+
+TUPLE: compound-literal sequence ;
+CONSTRUCTOR: <compound-literal> compound-literal ( sequence -- obj ) ;
+
+GENERIC: make-compound-literals ( seq -- seq' )
+M: object make-compound-literals ;
+M: array make-compound-literals
+    [ [ lexed-underlying ] bi@ slices-touch? ] monotonic-split
+    [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
 
 ERROR: whitespace-expected-after n string ch ;
 ERROR: subseq-expected-but-got-eof n string expected ;
@@ -82,7 +90,7 @@ ERROR: string-expected-got-eof n string ;
 :: make-matched-literal ( payload closing tag opening class -- literal )
     class new
         tag >string >>tag
-        payload >>payload
+        payload make-compound-literals >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
@@ -211,15 +219,11 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
-    dup length 1 = [
-        read-word-or-til-semicolon
-    ] [
-        {
-            { [ dup lower? ] [ read-lowercase-colon ] }
-            { [ dup upper? ] [ read-til-semicolon ] }
-            [ colon-word-must-be-all-uppercase-or-lowercase ]
-        } cond
-    ] if ;
+    {
+        { [ dup lower? ] [ read-lowercase-colon ] }
+        { [ dup upper? ] [ read-til-semicolon ] }
+        [ colon-word-must-be-all-uppercase-or-lowercase ]
+    } cond ;
 
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
@@ -299,7 +303,7 @@ CONSTANT: factor-lexing-rules {
     factor-lexing-rules rules>call-lexer ;
 
 : string>literals ( string -- sequence )
-    [ 0 ] dip [ lex-factor ] loop>array 2nip ;
+    [ 0 ] dip [ lex-factor ] loop>array 2nip make-compound-literals ;
 
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop

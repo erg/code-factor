@@ -26,6 +26,7 @@ IN: modern.out.tests
 { t } [ " ARRAY: ;" rewrite-same-string ] unit-test
 { t } [ " ARRAY: 1 ;{ inline }" rewrite-same-string ] unit-test
 { t } [ " ARRAY: 1 ;[ 0 ]" rewrite-same-string ] unit-test
+{ t } [ " {  array:  1  array:  2  }" rewrite-same-string ] unit-test
 
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 

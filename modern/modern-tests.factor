@@ -1,6 +1,6 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors modern sequences strings tools.test ;
+USING: accessors kernel modern sequences strings tools.test ;
 IN: modern.tests
 
 { 0 } [ "" string>literals length ] unit-test
@@ -65,6 +65,10 @@ IN: modern.tests
 { 2 } [ "a!omg lol" string>literals length ] unit-test
 { 3 } [ "a! omg lol" string>literals length ] unit-test
 { 2 } [ "a![[omg]] lol" string>literals length ] unit-test
+
+{ t } [ "[ ][ ][ ]" string>literals length 1 = ] unit-test
+{ t } [ "[ ][ ][ ]" string>literals first compound-literal? ] unit-test
+{ t } [ "[ ][ ][ ]" string>literals first sequence>> length 3 = ] unit-test
 
 ! This is broken.
 ! hex[[abc]] -> hex#[[abc]] ! commented out hex literal!

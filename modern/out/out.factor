@@ -110,6 +110,9 @@ M: lowercase-colon-literal write-literal
         [ payload>> write-literal ] ! don't need write-whitespace here, the recursion does it
     } cleave ;
 
+M: compound-literal write-literal
+    sequence>> [ write-literal ] each ;
+
 ! Swap in write-literal for renaming
 
 : write-modern-loop ( quot -- )
