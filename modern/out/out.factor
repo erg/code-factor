@@ -100,7 +100,7 @@ M: semicolon-literal write-literal
         [ payload>> io:write ]
     } cleave ;
 
-M: colon-literal write-literal
+M: uppercase-colon-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]
         [ tag>> write ]
@@ -108,6 +108,15 @@ M: colon-literal write-literal
         [ delimiter>> write ]
         [ payload>> [ write-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ semi>> write-literal ]
+    } cleave ;
+
+M: lowercase-colon-literal write-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ tag>> io:write ]
+        [ seq>> 1 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+        [ payload>> write-literal ] ! don't need write-whitespace here, the recursion does it
     } cleave ;
 
 ! Swap in write-literal for renaming

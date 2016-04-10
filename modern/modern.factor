@@ -33,7 +33,8 @@ TUPLE: exact-tag-literal < tag-literal ;
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
-TUPLE: colon-literal < matched-literal semi ;
+TUPLE: uppercase-colon-literal < matched-literal semi ;
+TUPLE: lowercase-colon-literal < delimited-literal ;
 TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
 TUPLE: semicolon-literal < delimited-literal ;
@@ -68,7 +69,7 @@ ERROR: string-expected-got-eof n string ;
 :: make-delimited-literal ( payload last tag delimiter class -- literal )
     class new
         tag >string >>tag
-        payload >string >>payload
+        payload dup slice? [ >string ] when >>payload
         tag last [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         delimiter >string >>delimiter
         tag delimiter payload 3array >>seq ; inline
@@ -213,7 +214,7 @@ ERROR: whitespace-required-before-semicolon n string slice ;
 
 : read-til-semicolon ( n string slice -- n' string semi )
     [ ";" lex-until '[ [ _ lexed-underlying read-semicolon ] dip ] keep ] dip
-    1 cut-slice* colon-literal make-colon-matched-literal ;
+    1 cut-slice* uppercase-colon-literal make-colon-matched-literal ;
 
 : read-word-or-til-semicolon ( n string slice -- n' string obj )
     2over next-char-from* "\s\r\n" member? [
@@ -228,7 +229,7 @@ ERROR: colon-word-must-be-all-uppercase-or-lowercase word ;
         read-word-or-til-semicolon
     ] [
         {
-            ! { [ dup lower? ] [ [ lex-factor ] dip ] }
+            { [ dup lower? ] [ [ lex-factor dup ] dip 1 cut-slice* lowercase-colon-literal make-delimited-literal ] }
             { [ dup upper? ] [ read-til-semicolon ] }
             [ ]
         } cond
