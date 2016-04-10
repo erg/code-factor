@@ -7,21 +7,20 @@ modern.slices multiline namespaces quotations sequences
 sequences.extras sorting splitting strings unicode ;
 IN: modern
 
-! Base rules, everything should have a generator macro and optional sublexers
+! Base rules, everything should have a generator macro
 TUPLE: lexer generator ;
-TUPLE: lexer-with-sublexers < lexer sublexers ;
 
 ! Declarative rules, add more!
 TUPLE: tag-lexer < lexer ; ! default, if nothing else matches, add one with regexp for c-style names etc
-TUPLE: exact-tag-lexer < lexer token ;
 TUPLE: dquote-lexer < lexer delimiter escape ignore-whitespace? ; ! ``close`` slot someday to allow ` '
-TUPLE: matched-lexer < lexer-with-sublexers delimiter double-char ; ! ``close`` slot someday, to allow `` ''
+TUPLE: matched-lexer < lexer delimiter double-char ; ! ``close`` slot someday, to allow `` ''
 TUPLE: backtick-lexer < lexer delimiter ;
 TUPLE: backslash-lexer < lexer delimiter payload-exception? ; ! payload-exception is \n words
 TUPLE: line-comment-lexer < lexer delimiter word-name-exception? ; ! escape-newline-exception? (like C)
 TUPLE: colon-lexer < lexer delimiter ;
 TUPLE: semicolon-lexer < lexer delimiter ; ! ; inline foldable
 TUPLE: whitespace-lexer < lexer delimiter ; ! \s \r \n \t?
+TUPLE: terminator-lexer < lexer delimiter ;
 
 ! Base lexer result
 TUPLE: literal underlying seq lexer ;
@@ -29,7 +28,6 @@ TUPLE: tag-literal < literal tag ;
 TUPLE: matched-literal < tag-literal delimiter payload ;
 TUPLE: delimited-literal < tag-literal delimiter payload ;
 
-TUPLE: exact-tag-literal < tag-literal ;
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
@@ -39,6 +37,7 @@ TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
 TUPLE: semicolon-literal < delimited-literal ;
 TUPLE: line-comment-literal < delimited-literal ;
+TUPLE: terminator-literal < tag-literal ;
 TUPLE: whitespace-literal < tag-literal ;
 
 TUPLE: compound-literal sequence ;
@@ -55,6 +54,12 @@ ERROR: string-expected-got-eof n string ;
 
 :: make-tag-literal ( tag -- literal )
     tag-literal new
+        tag >string >>tag
+        tag >>underlying
+        tag 1array >>seq ; inline
+
+:: make-tag-class-literal ( tag class -- literal )
+    class new
         tag >string >>tag
         tag >>underlying
         tag 1array >>seq ; inline
@@ -209,13 +214,17 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         merge-slice-til-whitespace make-tag-literal
     ] if ;
 
+: read-lowercase-colon ( n string slice -- n' string lowercase-colon )
+    [ lex-factor dup ] dip 1 cut-slice*
+    lowercase-colon-literal make-delimited-literal ;
+
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
     dup length 1 = [
         read-word-or-til-semicolon
     ] [
         {
-            { [ dup lower? ] [ [ lex-factor dup ] dip 1 cut-slice* lowercase-colon-literal make-delimited-literal ] }
+            { [ dup lower? ] [ read-lowercase-colon ] }
             { [ dup upper? ] [ read-til-semicolon ] }
             [ colon-word-must-be-all-uppercase-or-lowercase ]
         } cond
@@ -242,6 +251,10 @@ ERROR: backslash-expects-whitespace slice ;
     dup length 0 =
     [ drop [ 1 + ] dip lex-factor ]
     [ make-tag-literal ] if ;
+
+ERROR: mismatched-terminator n string slice ;
+: read-terminator ( n string slice -- n' string slice )
+    terminator-literal make-tag-class-literal ;
 
 SYMBOL: lexing-delimiters
 
@@ -275,10 +288,17 @@ CONSTANT: factor-lexing-rules {
     T{ backtick-lexer { generator read-backtick } { delimiter CHAR: ` } }
     T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
     T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
+    
     T{ colon-lexer { generator read-colon } { delimiter CHAR: : } }
     T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
     T{ matched-lexer { generator read-brace } { delimiter CHAR: { } }
     T{ matched-lexer { generator read-paren } { delimiter CHAR: ( } }
+    
+    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ; } }
+    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ] } }
+    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: } } }
+    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ) } }
+    
     T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \s } }
     T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \r } }
     T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \n } }
