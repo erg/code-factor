@@ -225,10 +225,13 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     lowercase-colon-literal make-delimited-literal ;
 
 : strict-upper? ( string -- ? )
-    [ CHAR: A CHAR: Z between? ] all? ;
+    [ { [ CHAR: A CHAR: Z between? ] [ CHAR: : = ] } 1|| ] all? ;
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
+    read-til-semicolon ;
+
+/*
     dup length 1 = [
         read-til-semicolon
     ] [
@@ -237,6 +240,7 @@ ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
             [ read-lowercase-colon ]
         } cond
     ] if ;
+*/
 
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
