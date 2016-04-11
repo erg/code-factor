@@ -31,6 +31,9 @@ ERROR: unexpected-end n string ;
         [ 2drop f ] [ nip ] 2bi f
     ] if ;
 
+: prev-char-from-slice ( slice -- ch/f )
+    [ from>> 1 - ] [ seq>> ] bi ?nth ;
+
 : next-char-from* ( n/f string -- ch/f )
     next-char-from 2nip ;
 

@@ -229,18 +229,18 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
-    read-til-semicolon ;
-
-/*
     dup length 1 = [
-        read-til-semicolon
+        dup prev-char-from-slice { CHAR: \s CHAR: \r CHAR: \n f } member? [
+            read-til-semicolon
+        ] [
+            read-lowercase-colon
+        ] if
     ] [
         {
             { [ dup strict-upper? ] [ read-til-semicolon ] }
             [ read-lowercase-colon ]
         } cond
     ] if ;
-*/
 
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
