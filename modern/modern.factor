@@ -3,9 +3,9 @@
 USING: accessors arrays assocs assocs.extras combinators
 combinators.short-circuit constructors continuations fry
 io.encodings.utf8 io.files kernel locals macros make math
-modern.paths modern.slices multiline namespaces quotations
-sequences sequences.extras sorting splitting splitting.monotonic
-strings unicode ;
+math.order modern.paths modern.slices multiline namespaces
+quotations sequences sequences.extras splitting
+splitting.monotonic strings unicode ;
 IN: modern
 
 ! Base rules, everything should have a generator macro
@@ -217,12 +217,14 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     [ lex-factor dup ] dip 1 cut-slice*
     lowercase-colon-literal make-delimited-literal ;
 
+: strict-upper? ( string -- ? )
+    [ CHAR: A CHAR: Z between? ] all? ;
+
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
     {
-        { [ dup lower? ] [ read-lowercase-colon ] }
-        { [ dup upper? ] [ read-til-semicolon ] }
-        [ colon-word-must-be-all-uppercase-or-lowercase ]
+        { [ dup strict-upper? ] [ read-til-semicolon ] }
+        [ read-lowercase-colon ]
     } cond ;
 
 ! Words like append! and suffix! are allowed for now.
