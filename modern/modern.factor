@@ -22,6 +22,7 @@ TUPLE: colon-lexer < lexer delimiter ;
 TUPLE: semicolon-lexer < lexer delimiter ; ! ; inline foldable
 TUPLE: whitespace-lexer < lexer delimiter ; ! \s \r \n \t?
 TUPLE: terminator-lexer < lexer delimiter ;
+TUPLE: decorator-lexer < lexer delimiter ;
 
 ! Base lexer result
 TUPLE: literal underlying seq lexer ;
@@ -40,6 +41,7 @@ TUPLE: semicolon-literal < delimited-literal ;
 TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: terminator-literal < tag-literal ;
 TUPLE: whitespace-literal < tag-literal ;
+TUPLE: decorator-literal < tag-literal ;
 
 GENERIC: lexed-underlying ( obj -- slice )
 M: f lexed-underlying ;
@@ -52,7 +54,12 @@ CONSTRUCTOR: <compound-literal> compound-literal ( sequence -- obj ) ;
 GENERIC: make-compound-literals ( seq -- seq' )
 M: object make-compound-literals ;
 M: array make-compound-literals
-    [ [ lexed-underlying ] bi@ slices-touch? ] monotonic-split
+    [
+        {
+            [ [ lexed-underlying ] bi@ slices-touch? ]
+            [ nip decorator-literal? ]
+        } 2||
+    ] monotonic-split
     [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
 
 ERROR: whitespace-expected-after n string ch ;
@@ -222,10 +229,14 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
-    {
-        { [ dup strict-upper? ] [ read-til-semicolon ] }
-        [ read-lowercase-colon ]
-    } cond ;
+    dup length 1 = [
+        read-til-semicolon
+    ] [
+        {
+            { [ dup strict-upper? ] [ read-til-semicolon ] }
+            [ read-lowercase-colon ]
+        } cond
+    ] if ;
 
 ! Words like append! and suffix! are allowed for now.
 : read-exclamation ( n string slice -- n' string obj )
@@ -252,6 +263,9 @@ ERROR: backslash-expects-whitespace slice ;
 ERROR: mismatched-terminator n string slice ;
 : read-terminator ( n string slice -- n' string slice )
     terminator-literal make-tag-class-literal ;
+
+: read-decorator ( n string slice -- n' string slice )
+    merge-slice-til-whitespace decorator-literal make-tag-class-literal ;
 
 SYMBOL: lexing-delimiters
 
@@ -285,6 +299,7 @@ CONSTANT: factor-lexing-rules {
     T{ backtick-lexer { generator read-backtick } { delimiter CHAR: ` } }
     T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
     T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
+    T{ decorator-lexer { generator read-decorator } { delimiter CHAR: @ } }
     
     T{ colon-lexer { generator read-colon } { delimiter CHAR: : } }
     T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
