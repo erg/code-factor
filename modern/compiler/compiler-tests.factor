@@ -1,8 +1,9 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: kernel modern.compiler tools.test ;
+USING: kernel modern.compiler multiline tools.test ;
 IN: modern.compiler.tests
 
+/*
 {
     H{ { "scratchpad2" { "a" } } }
 } [
@@ -47,3 +48,5 @@ IN: modern.compiler.tests
     : add-subtract ( a b c -- d ) + - ;"
     quick-compile-string vocab>printable
 ] unit-test
+
+*/

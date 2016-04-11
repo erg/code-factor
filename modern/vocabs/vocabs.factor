@@ -8,6 +8,7 @@ QUALIFIED: words
 QUALIFIED: vocabs
 IN: modern.vocabs
 
+/*
 ! dict is all vocabs
 TUPLE: linear-state { using hash-set }
 { using-namespace hashtable }
@@ -76,4 +77,5 @@ ERROR: key-already-exists value key assoc ;
 : vocabs>namespace ( hashtable -- namespace )
     [ H{ } clone ] dip over '[
         nip [ swap _ push-at ] assoc-each
-    ] assoc-each ;
+    ] assoc-each ;  
+*/

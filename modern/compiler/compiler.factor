@@ -13,6 +13,8 @@ QUALIFIED: words
 QUALIFIED: vocabs
 IN: modern.compiler
 
+
+/*
 : path>parsers ( name -- seq )
     quick-parse-path
     [ [ class-of , ] deep-each ] { } make members ;
@@ -45,6 +47,7 @@ IN: modern.compiler
 : print-parsers ( seq -- )
     members natural-sort
     [ name>> "M: modern:" " precompile ;" surround print ] each ;
+
 
 
 
@@ -341,6 +344,8 @@ M: run-time-long-string-literal define-pass drop ;
 
 : vocabs>printable ( seq -- seq' )
     [ vocab>printable ] map ;
+
+*/
 
 /*
 ! Find all primitives/builtin classes

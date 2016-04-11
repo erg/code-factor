@@ -5,6 +5,8 @@ modern.quick-parser sequences sequences.extras sorting ;
 QUALIFIED-WITH: modern.syntax m
 IN: modern.tools
 
+
+/*
 : all-parsed-alist ( -- alist )
     all-factor-files
     [ dup quick-parse-path ] map>alist ;
@@ -21,3 +23,4 @@ IN: modern.tools
 : print-alist-results ( seq -- )
     sort-keys
     [ [ print ] dip >out [ print ] each nl ] assoc-each ;
+*/

@@ -1,9 +1,10 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors kernel modern.syntax modern.quick-parser
-sequences tools.test ;
+USING: accessors kernel modern.quick-parser modern.syntax
+multiline sequences tools.test ;
 IN: modern.syntax.tests
 
+/*
 { t } [ "( )" qparse length 1 = ] unit-test
 { t } [ "( a )" qparse length 1 = ] unit-test
 { t } [ "( a b c -- d )" qparse length 1 = ] unit-test
@@ -175,3 +176,4 @@ IN: modern.syntax.tests
 { t } [ "code[ a b ]" [ qparse first slice>> ] keep sequence= ] unit-test
 { t } [ "code{ a b }" [ qparse first slice>> ] keep sequence= ] unit-test
 { t } [ "code( a b )" [ qparse first slice>> ] keep sequence= ] unit-test
+*/

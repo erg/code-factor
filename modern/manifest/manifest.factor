@@ -126,6 +126,8 @@ TUPLE: module
 
 */
 
+
+/*
 TUPLE: loading path in using qualified ;
 
 
@@ -243,3 +245,5 @@ M: qualified-with obj>vocab-names object>> first2 [ >string ] bi@ <qualified2-wi
 : html-entitites ( -- obj ) "html.entities" load-modern-vocab ;
 : gl ( -- obj ) "opengl.gl" load-modern-vocab ;
 : compression ( -- obj ) "compression.inflate" load-modern-vocab ;
+
+*/

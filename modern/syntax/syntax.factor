@@ -5,6 +5,8 @@ IN: modern.syntax
 QUALIFIED: sequences
 QUALIFIED: strings
 
+
+/*
 ! Can go away:
 LEXER: heredoc HEREDOC: token pick strings:>string multiline-string-until ;
 ! string literals: P" URL" SBUF" DLL"
@@ -90,7 +92,7 @@ LEXER: pipe-separator | ;
 ! LEXER: data-map!-parens data-map!( (parse-psignature) ;
 ! LEXER: shuffle-parens shuffle( (parse-psignature) ;
 
-LEXER: c-comment /* "*/" multiline-string-until ;
+! LEXER: c-comment /* "* /" multiline-string-until ;
 
 ! BEGIN REGULAR WORDS
 LEXER: f f ;
@@ -393,3 +395,5 @@ LEXER: framework FRAMEWORK: parse ;
 LEXER: SEL: SEL: token ;
 LEXER: super-selector SUPER-> token ;
 ! LEXER: cocoa-selector -> token ;
+
+*/
