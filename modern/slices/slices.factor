@@ -102,12 +102,7 @@ ERROR: unexpected-end n string ;
         f string f f
     ] if ; inline
 
-: skip-one-space-after ( n string -- n' string )
-    next-char-from [
-        dup blank?
-        [ drop ]
-        [ whitespace-expected-after ] if
-    ] when* ;
+ERROR: subseq-expected-but-got-eof n string expected ;
 
 :: slice-til-string ( n string search --  n' string payload end-string )
     search string n start* :> n'

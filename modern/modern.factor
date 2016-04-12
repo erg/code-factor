@@ -8,6 +8,7 @@ quotations sequences sequences.extras splitting
 splitting.monotonic strings unicode ;
 IN: modern
 
+<<
 ! Base rules, everything should have a generator macro
 TUPLE: lexer generator ;
 
@@ -42,6 +43,7 @@ TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: terminator-literal < tag-literal ;
 TUPLE: whitespace-literal < tag-literal ;
 TUPLE: decorator-literal < tag-literal ;
+>>
 
 GENERIC: lexed-underlying ( obj -- slice )
 M: f lexed-underlying ;
@@ -63,7 +65,6 @@ M: array make-compound-literals
     [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
 
 ERROR: whitespace-expected-after n string ch ;
-ERROR: subseq-expected-but-got-eof n string expected ;
 ERROR: expected-more-tokens n string expected ;
 ERROR: string-expected-got-eof n string ;
 
