@@ -225,7 +225,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     lowercase-colon-literal make-delimited-literal ;
 
 : strict-upper? ( string -- ? )
-    [ { [ CHAR: A CHAR: Z between? ] [ CHAR: : = ] } 1|| ] all? ;
+    [ { [ CHAR: A CHAR: Z between? ] [ ":-" member? ] } 1|| ] all? ;
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
@@ -269,6 +269,7 @@ ERROR: mismatched-terminator n string slice ;
     terminator-literal make-tag-class-literal ;
 
 : read-decorator ( n string slice -- n' string slice )
+    ! [ lex-factor ] 2dip
     merge-slice-til-whitespace decorator-literal make-tag-class-literal ;
 
 SYMBOL: lexing-delimiters
