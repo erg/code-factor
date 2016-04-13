@@ -226,7 +226,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     lowercase-colon-literal make-delimited-literal ;
 
 : strict-upper? ( string -- ? )
-    [ { [ CHAR: A CHAR: Z between? ] [ ":-" member? ] } 1|| ] all? ;
+    [ { [ CHAR: A CHAR: Z between? ] [ "#:-" member? ] } 1|| ] all? ;
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
