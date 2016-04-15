@@ -87,6 +87,17 @@ M: decorator-literal literal>string-name f ;
 : literals>identifiers ( seq -- assoc )
     [ literal>string-name [ identifier-pass ] [ drop f ] if* ] map-zip ;
 
+TUPLE: manifest2 identifiers ;
+
+: <manifest2> ( -- manifest2 )
+    manifest2 new
+        H{ } clone >>identifiers ; inline
+
+: literals>manifest ( seq -- manifest )
+    [ <manifest2> ] dip {
+        [ literals>identifiers swap identifiers>> '[ [ _ push-at ] with each ] assoc-each ]
+        [ drop ]
+    } 2cleave ;
 
 
 /*
