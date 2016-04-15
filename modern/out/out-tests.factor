@@ -30,6 +30,10 @@ IN: modern.out.tests
 { t } [ "  ABC: abc{ 1 2 3   abc}  ABC;" rewrite-same-string ] unit-test
 { t } [ " a{   a{   a{  a}   }   a}" rewrite-same-string ] unit-test
 
+! Funky spaced decorator test
+{ t } [
+    " lol@  {    1   }@    {   2   }@    hi   @{   3    }   @{   4    }  @inline" rewrite-same-string
+] unit-test
 ! Disable these for now.
 ! { t } [ " array: 1" rewrite-same-string ] unit-test
 ! { t } [ " {  array:  1  array:  2  }" rewrite-same-string ] unit-test
