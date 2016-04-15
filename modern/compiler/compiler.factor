@@ -22,44 +22,44 @@ SYNTAX: STRING-M:
     ] with-definition ;    
 >>
 
-STRING-DISPATCH: string>definers ( literal string -- strings )
-STRING-M: singleton string>definers
+STRING-DISPATCH: identifier-pass ( literal string -- strings )
+STRING-M: singleton identifier-pass
     payload>> [ tag>> ] map dup [ "?" append ] map append ;
-STRING-M: singletons string>definers
+STRING-M: singletons identifier-pass
     payload>> [ tag>> ] map dup [ "?" append ] map append ;
-STRING-M: symbol string>definers payload>> [ tag>> ] map ;
-STRING-M: symbols string>definers payload>> [ tag>> ] map ;
-STRING-M: slot string>definers payload>> [ tag>> ] map ;
-STRING-M: mixin string>definers
+STRING-M: symbol identifier-pass payload>> [ tag>> ] map ;
+STRING-M: symbols identifier-pass payload>> [ tag>> ] map ;
+STRING-M: slot identifier-pass payload>> [ tag>> ] map ;
+STRING-M: mixin identifier-pass
     payload>> [ tag>> ] map dup [ "?" append ] map append ;
-STRING-M: using string>definers drop f ;
-STRING-M: use string>definers drop f ;
-STRING-M: in string>definers drop f ;
-STRING-M: word string>definers payload>> first tag>> 1array ;
-STRING-M: script string>definers drop f ;
-STRING-M: m string>definers drop f ;
-STRING-M: generic string>definers payload>> first tag>> 1array ;
-STRING-M: generic# string>definers payload>> first tag>> 1array ;
-STRING-M: constant string>definers payload>> first tag>> 1array ;
-STRING-M: c string>definers payload>> first tag>> 1array ;
-STRING-M: hook string>definers payload>> first tag>> 1array ;
-STRING-M: tuple string>definers
+STRING-M: using identifier-pass drop f ;
+STRING-M: use identifier-pass drop f ;
+STRING-M: in identifier-pass drop f ;
+STRING-M: word identifier-pass payload>> first tag>> 1array ;
+STRING-M: script identifier-pass drop f ;
+STRING-M: m identifier-pass drop f ;
+STRING-M: generic identifier-pass payload>> first tag>> 1array ;
+STRING-M: generic# identifier-pass payload>> first tag>> 1array ;
+STRING-M: constant identifier-pass payload>> first tag>> 1array ;
+STRING-M: c identifier-pass payload>> first tag>> 1array ;
+STRING-M: hook identifier-pass payload>> first tag>> 1array ;
+STRING-M: tuple identifier-pass
     payload>> first tag>> dup "?" append 2array ;
-STRING-M: error string>definers
+STRING-M: error identifier-pass
     payload>> first tag>> dup "?" append 2array ;
-STRING-M: instance string>definers drop f ;
-STRING-M: primitive string>definers payload>> first tag>> 1array ;
-STRING-M: builtin string>definers
+STRING-M: instance identifier-pass drop f ;
+STRING-M: primitive identifier-pass payload>> first tag>> 1array ;
+STRING-M: builtin identifier-pass
     payload>> first tag>> dup "?" append 2array ;
-STRING-M: predicate string>definers
+STRING-M: predicate identifier-pass
     payload>> first tag>> dup "?" append 2array ;
-STRING-M: math string>definers payload>> first tag>> 1array ;
-STRING-M: union string>definers
+STRING-M: math identifier-pass payload>> first tag>> 1array ;
+STRING-M: union identifier-pass
     payload>> first tag>> dup "?" append 2array ;
 
-STRING-M: defer string>definers payload>> first tag>> 1array ;
-STRING-M: initialize string>definers payload>> first tag>> 1array ;
-STRING-M: startup-`hook string>definers payload>> first tag>> 1array ;
+STRING-M: defer identifier-pass payload>> first tag>> 1array ;
+STRING-M: initialize identifier-pass payload>> first tag>> 1array ;
+STRING-M: startup-`hook identifier-pass payload>> first tag>> 1array ;
 
 
 GENERIC: decorator-only-compound? ( obj -- ? )
@@ -84,8 +84,9 @@ M: compound-literal literal>string-name
 
 M: decorator-literal literal>string-name f ;
 
-: literals>definers ( seq -- assoc )
-    [ literal>string-name [ string>definers ] [ drop f ] if* ] map-zip ;
+: literals>identifiers ( seq -- assoc )
+    [ literal>string-name [ identifier-pass ] [ drop f ] if* ] map-zip ;
+
 
 
 /*

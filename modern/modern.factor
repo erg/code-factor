@@ -26,7 +26,7 @@ TUPLE: terminator-lexer < lexer delimiter ;
 TUPLE: decorator-lexer < lexer delimiter ;
 
 ! Base lexer result
-TUPLE: literal underlying seq lexer ;
+TUPLE: literal underlying seq lexer left-decorators right-decorators ;
 TUPLE: tag-literal < literal tag ;
 TUPLE: matched-literal < tag-literal delimiter payload closing-tag ;
 TUPLE: delimited-literal < tag-literal delimiter payload ;
@@ -62,11 +62,14 @@ M: array make-compound-literals
     [
         {
             [ [ lexed-underlying ] bi@ slices-touch? ]
-            [ [ decorator-literal? ] either? ]
+            [ [ ] [ left-decorator-literal? ] bi* and ]
+            [ [ right-decorator-literal? ] [ ] bi* and ]
         } 2||
     ] monotonic-split
     [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
 
+! We have empty decorators, just the @ right here
+! wrap the decorated object in the payload slot
 GENERIC: collapse-decorators ( seq -- seq' )
 M: object collapse-decorators ;
 M: array collapse-decorators
