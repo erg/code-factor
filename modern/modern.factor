@@ -135,8 +135,8 @@ ERROR: mismatched-closing opening closing ;
             closing tag>> length 1 > [
                 tag opening-delimiter append
                 matching-delimiter-string closing tag>> sequence= [ opening-delimiter closing tag>> mismatched-closing ] unless
-                closing tag>> >>closing-tag
             ] when
+            closing tag>> >>closing-tag
         ] when
         tag opening-delimiter payload closing 4array >>seq ; inline
 
@@ -195,14 +195,14 @@ DEFER: lex
 DEFER: lex-factor
 ERROR: lex-expected-but-got-eof n string expected ;
 ! For implementing [ { (
-: lex-until ( n string token -- n' string payload closing )
+: lex-until ( n string tags -- n' string payload closing )
     pick [
         3dup '[
             [
                 lex-factor dup , [
                     dup tag-literal? [
-                        ! B underlying>> _ sequence= not
-                        underlying>> _ tail? not
+                        ! } gets a chance, but then also full seq { } after recursion...
+                        [ _ ] dip underlying>> '[ _ sequence= ] any? not
                     ] [
                         drop t ! loop again?
                     ] if
@@ -224,14 +224,14 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         n string tag
         2over nth-check-eof {
             { [ dup openstreq member? ] [ ch read-double-matched ] } ! (=( or ((
-            { [ dup blank? ] [ drop [ closestr1 lex-until ] dip 1 cut-slice* single-matched-literal make-matched-literal ] } ! ( foo )
+            { [ dup blank? ] [ drop dup '[ _ matching-delimiter-string closestr1 2array lex-until ] dip 1 cut-slice* single-matched-literal make-matched-literal ] } ! ( foo )
             [ drop [ slice-til-whitespace drop ] dip span-slices make-tag-literal ]  ! (foo)
         } cond
     ] ;
 
-: read-paren ( n string slice -- n' string slice' ) CHAR: ( read-matched ;
-: read-brace ( n string slice -- n' string slice' ) CHAR: { read-matched ;
 : read-bracket ( n string slice -- n' string slice' ) CHAR: [ read-matched ;
+: read-brace ( n string slice -- n' string slice' ) CHAR: { read-matched ;
+: read-paren ( n string slice -- n' string slice' ) CHAR: ( read-matched ;
 
 : read-backtick ( n string opening -- n' string obj )
     [
@@ -266,7 +266,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     ] if ;
 
 : read-til-semicolon ( n string slice -- n' string semi )
-    [ ";" lex-until ] dip
+    dup '[ but-last ";" append ";" 2array lex-until ] dip
     1 cut-slice* uppercase-colon-literal make-matched-literal ;
 
 : read-word-or-til-semicolon ( n string slice -- n' string obj )

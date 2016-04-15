@@ -26,9 +26,15 @@ IN: modern.out.tests
 { t } [ " ARRAY: 1 ;{ inline }" rewrite-same-string ] unit-test
 { t } [ " ARRAY: 1 ;[ 0 ]" rewrite-same-string ] unit-test
 
+{ t } [ "   abc{ 1 2 3   abc}" rewrite-same-string ] unit-test
+{ t } [ "  ABC: abc{ 1 2 3   abc}  ABC;" rewrite-same-string ] unit-test
+{ t } [ " a{   a{   a{  a}   }   a}" rewrite-same-string ] unit-test
+
 ! Disable these for now.
 ! { t } [ " array: 1" rewrite-same-string ] unit-test
 ! { t } [ " {  array:  1  array:  2  }" rewrite-same-string ] unit-test
+
+
 
 { "fixnum^33 ch^@" } [ "fixnum`33 ch`@" rename-backtick-delimiter ] unit-test
 

@@ -50,6 +50,13 @@ IN: modern.tests
 { 1 } [ "abc( 1 )" string>literals length ] unit-test
 { 1 } [ "abc( 1 abc)" string>literals length ] unit-test
 
+[ "A{ B}" string>literals ] must-fail
+[ "A( B)" string>literals ] must-fail
+[ "A[ B]" string>literals ] must-fail
+[ "A: B;" string>literals ] must-fail
+[ "A: AA;" string>literals ] must-fail
+[ "A: B{ C} A;" string>literals ] must-fail
+
 { 1 } [ "!omg" string>literals length ] unit-test
 { 1 } [ "! omg" string>literals length ] unit-test
 { 1 } [ "![[omg]]" string>literals length ] unit-test
