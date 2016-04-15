@@ -110,6 +110,20 @@ M: lowercase-colon-literal write-literal
         [ payload>> write-literal ] ! don't need write-whitespace here, the recursion does it
     } cleave ;
 
+M: left-decorator-literal write-literal
+    {
+        [ seq>> 0 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+        [ payload>> write-literal ] ! don't need write-whitespace here, the recursion does it
+    } cleave ;
+
+M: right-decorator-literal write-literal
+    {
+        [ payload>> write-literal ] ! don't need write-whitespace here, the recursion does it
+        [ seq>> 0 swap nth write-whitespace ]
+        [ delimiter>> io:write ]
+    } cleave ;
+
 M: compound-literal write-literal
     sequence>> [ write-literal ] each ;
 
