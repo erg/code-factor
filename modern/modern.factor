@@ -28,14 +28,14 @@ TUPLE: decorator-lexer < lexer delimiter ;
 ! Base lexer result
 TUPLE: literal underlying seq lexer ;
 TUPLE: tag-literal < literal tag ;
-TUPLE: matched-literal < tag-literal delimiter payload ;
+TUPLE: matched-literal < tag-literal delimiter payload closing-tag ;
 TUPLE: delimited-literal < tag-literal delimiter payload ;
 TUPLE: decorator-literal < literal delimiter payload ;
 
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
-TUPLE: uppercase-colon-literal < matched-literal ;
+TUPLE: uppercase-colon-literal < single-matched-literal ;
 TUPLE: lowercase-colon-literal < delimited-literal ;
 TUPLE: backtick-literal < delimited-literal ;
 TUPLE: backslash-literal < delimited-literal ;
@@ -135,6 +135,7 @@ ERROR: mismatched-closing opening closing ;
             closing tag>> length 1 > [
                 tag opening-delimiter append
                 matching-delimiter-string closing tag>> sequence= [ opening-delimiter closing tag>> mismatched-closing ] unless
+                closing tag>> >>closing-tag
             ] when
         ] when
         tag opening-delimiter payload closing 4array >>seq ; inline

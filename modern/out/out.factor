@@ -33,7 +33,7 @@ M: single-matched-literal write-literal
         [ delimiter>> write ]
         [ payload>> [ write-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ seq>> 3 swap nth lexed-underlying write-whitespace ]
-        [ delimiter>> matching-delimiter-string write ]
+        [ closing-tag>> write ]
     } cleave ;
 
 M: double-matched-literal write-literal
@@ -98,7 +98,7 @@ M: uppercase-colon-literal write-literal
         [ delimiter>> write ]
         [ payload>> [ write-literal ] each ] ! don't need write-whitespace here, the recursion does it
         [ seq>> 3 swap nth lexed-underlying write-whitespace ]
-        [ delimiter>> matching-delimiter-string write ]
+        [ closing-tag>> write ]
     } cleave ;
 
 M: lowercase-colon-literal write-literal
