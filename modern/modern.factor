@@ -30,6 +30,9 @@ TUPLE: literal underlying seq lexer ;
 TUPLE: tag-literal < literal tag ;
 TUPLE: matched-literal < tag-literal delimiter payload ;
 TUPLE: delimited-literal < tag-literal delimiter payload ;
+TUPLE: decorator-literal < literal delimiter payload ;
+
+TUPLE: decorator-sentinel < literal delimiter ;
 
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
@@ -42,7 +45,9 @@ TUPLE: semicolon-literal < delimited-literal ;
 TUPLE: line-comment-literal < delimited-literal ;
 TUPLE: terminator-literal < tag-literal ;
 TUPLE: whitespace-literal < tag-literal ;
-TUPLE: decorator-literal < tag-literal ;
+
+TUPLE: left-decorator-literal < decorator-literal ;
+TUPLE: right-decorator-literal < decorator-literal ;
 >>
 
 GENERIC: lexed-underlying ( obj -- slice )
@@ -59,7 +64,8 @@ M: array make-compound-literals
     [
         {
             [ [ lexed-underlying ] bi@ slices-touch? ]
-            [ nip decorator-literal? ]
+            [ [ decorator-sentinel? ] either? ]
+            ! [ nip left-decorator-literal? ]
         } 2||
     ] monotonic-split
     [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
@@ -102,6 +108,23 @@ ERROR: string-expected-got-eof n string ;
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
+
+:: make-decorator-literal ( payload delimiter class -- literal )
+    class new
+        delimiter >>delimiter
+        payload >>payload
+        payload delimiter [ lexed-underlying ] bi@ ?span-slices >>underlying
+        class left-decorator-literal = [
+            delimiter payload 2array
+        ] [
+            payload delimiter 2array
+        ] if >>seq ; inline
+
+:: make-decorator-sentinel ( delimiter -- literal )
+    decorator-sentinel new
+        delimiter >>delimiter
+        delimiter 1array >>seq
+        delimiter >>underlying ; inline
 
 ERROR: long-opening-mismatch tag open n string ch ;
 
@@ -269,9 +292,33 @@ ERROR: mismatched-terminator n string slice ;
 : read-terminator ( n string slice -- n' string slice )
     terminator-literal make-tag-class-literal ;
 
-: read-decorator ( n string slice -- n' string slice )
-    ! [ lex-factor ] 2dip
-    merge-slice-til-whitespace decorator-literal make-tag-class-literal ;
+: ?blank? ( ch/f -- blank/f )
+    { [ blank? ] [ f = ] } 1|| ;
+
+<PRIVATE
+! work on underlying, index is on the @
+! @foo
+: left-decorator? ( obj -- ? )
+    {
+        [ char-before-slice ?blank? ]
+        [ next-char-from-slice ?blank? not ]
+    } 1&& ;
+
+! foo@
+: right-decorator? ( slice -- ? )
+    {
+        [ prev-char-from-slice-end ?blank? not ]
+        [ next-char-from-slice ?blank? ]
+    } 1&& ;
+
+PRIVATE>
+
+: read-decorator ( n string slice -- n' string obj )
+    {
+        { [ dup left-decorator? ] [ make-decorator-sentinel ] }
+        { [ dup right-decorator? ] [ dup length 1 > [ [ -1 + ] 2dip  -1 modify-to make-tag-literal ] [ make-decorator-sentinel ] if ] }
+        [ make-tag-literal ]
+    } cond ;
 
 SYMBOL: lexing-delimiters
 
