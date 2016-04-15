@@ -35,16 +35,20 @@ IN: modern.tests
 { 2 } [ "hex{=={abc}==} hex{=={cba}==}" string>literals length ] unit-test
 { 2 } [ "hex(==(abc)==) hex(==(cba)==)" string>literals length ] unit-test
 
+
 { 1 } [ "[ ]" string>literals length ] unit-test
 { 1 } [ "abc[ ]" string>literals length ] unit-test
 { 1 } [ "abc[ 1 ]" string>literals length ] unit-test
+{ 1 } [ "abc[ 1 abc]" string>literals length ] unit-test
 { 1 } [ "{ }" string>literals length ] unit-test
 { 1 } [ "abc{ }" string>literals length ] unit-test
 { 1 } [ "abc{ 1 }" string>literals length ] unit-test
+{ 1 } [ "abc{ 1 abc}" string>literals length ] unit-test
 
 { 1 } [ "( )" string>literals length ] unit-test
 { 1 } [ "abc( )" string>literals length ] unit-test
 { 1 } [ "abc( 1 )" string>literals length ] unit-test
+{ 1 } [ "abc( 1 abc)" string>literals length ] unit-test
 
 { 1 } [ "!omg" string>literals length ] unit-test
 { 1 } [ "! omg" string>literals length ] unit-test

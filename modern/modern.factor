@@ -124,13 +124,20 @@ ERROR: string-expected-got-eof n string ;
         delimiter >string >>delimiter
         tag delimiter payload 3array >>seq ; inline
 
-:: make-matched-literal ( payload closing tag opening class -- literal )
+ERROR: mismatched-closing opening closing ;
+:: make-matched-literal ( payload closing tag opening-delimiter class -- literal )
     class new
         tag >string >>tag
         payload postprocess-lexed >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
-        opening >string >>delimiter
-        tag opening payload closing 4array >>seq ; inline
+        opening-delimiter >string >>delimiter
+        dup single-matched-literal? [
+            closing tag>> length 1 > [
+                tag opening-delimiter append
+                matching-delimiter-string closing tag>> sequence= [ opening-delimiter closing tag>> mismatched-closing ] unless
+            ] when
+        ] when
+        tag opening-delimiter payload closing 4array >>seq ; inline
 
 :: make-decorator-literal ( payload delimiter class -- literal )
     class new
@@ -193,7 +200,8 @@ ERROR: lex-expected-but-got-eof n string expected ;
             [
                 lex-factor dup , [
                     dup tag-literal? [
-                        underlying>> _ sequence= not
+                        ! B underlying>> _ sequence= not
+                        underlying>> _ tail? not
                     ] [
                         drop t ! loop again?
                     ] if
