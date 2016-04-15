@@ -32,8 +32,6 @@ TUPLE: matched-literal < tag-literal delimiter payload ;
 TUPLE: delimited-literal < tag-literal delimiter payload ;
 TUPLE: decorator-literal < literal delimiter payload ;
 
-TUPLE: decorator-sentinel < literal delimiter ;
-
 TUPLE: dquote-literal < delimited-literal ;
 TUPLE: single-matched-literal < matched-literal ;
 TUPLE: double-matched-literal < matched-literal ;
@@ -64,11 +62,36 @@ M: array make-compound-literals
     [
         {
             [ [ lexed-underlying ] bi@ slices-touch? ]
-            [ [ decorator-sentinel? ] either? ]
-            ! [ nip left-decorator-literal? ]
+            [ [ decorator-literal? ] either? ]
         } 2||
     ] monotonic-split
     [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
+
+GENERIC: collapse-decorators ( seq -- seq' )
+M: object collapse-decorators ;
+M: array collapse-decorators
+    [
+        {
+            [ [ left-decorator-literal? ] [ ] bi* and ]
+            [ [ ] [ right-decorator-literal? ] bi* and ]
+        } 2||
+    ] monotonic-split
+    [
+        dup length 1 > [
+            first2
+            2dup [ left-decorator-literal? ] [ ] bi* and [
+                >>payload
+            ] [
+                [ payload<< ] keep
+            ] if
+        ] [
+            first
+        ] if
+    ] map ;
+
+: postprocess-lexed ( seq -- seq' )
+    collapse-decorators make-compound-literals ;
+
 
 ERROR: whitespace-expected-after n string ch ;
 ERROR: expected-more-tokens n string expected ;
@@ -104,7 +127,7 @@ ERROR: string-expected-got-eof n string ;
 :: make-matched-literal ( payload closing tag opening class -- literal )
     class new
         tag >string >>tag
-        payload make-compound-literals >>payload
+        payload postprocess-lexed >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         opening >string >>delimiter
         tag opening payload closing 4array >>seq ; inline
@@ -120,8 +143,8 @@ ERROR: string-expected-got-eof n string ;
             payload delimiter 2array
         ] if >>seq ; inline
 
-:: make-decorator-sentinel ( delimiter -- literal )
-    decorator-sentinel new
+:: make-decorator-sentinel ( delimiter left? -- literal )
+    left? left-decorator-literal right-decorator-literal ? new
         delimiter >>delimiter
         delimiter 1array >>seq
         delimiter >>underlying ; inline
@@ -315,8 +338,14 @@ PRIVATE>
 
 : read-decorator ( n string slice -- n' string obj )
     {
-        { [ dup left-decorator? ] [ make-decorator-sentinel ] }
-        { [ dup right-decorator? ] [ dup length 1 > [ [ -1 + ] 2dip  -1 modify-to make-tag-literal ] [ make-decorator-sentinel ] if ] }
+        { [ dup left-decorator? ] [ t make-decorator-sentinel ] }
+        { [ dup right-decorator? ] [
+            dup length 1 > [
+                [ -1 + ] 2dip
+                -1 modify-to make-tag-literal
+            ] [
+                f make-decorator-sentinel
+            ] if ] }
         [ make-tag-literal ]
     } cond ;
 
@@ -373,7 +402,7 @@ CONSTANT: factor-lexing-rules {
     factor-lexing-rules rules>call-lexer ;
 
 : string>literals ( string -- sequence )
-    [ 0 ] dip [ lex-factor ] loop>array 2nip make-compound-literals ;
+    [ 0 ] dip [ lex-factor ] loop>array 2nip postprocess-lexed ;
 
 : vocab>literals ( vocab -- sequence )
     ".private" ?tail drop
