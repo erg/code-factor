@@ -1,15 +1,16 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors arrays assocs combinators definitions effects
-effects.parser fry io.pathnames kernel lexer modern multiline
-parser sequences sequences.extras splitting stack-checker
-unicode words sets ;
+USING: accessors arrays assocs combinators
+combinators.short-circuit definitions effects effects.parser fry
+graphs io.pathnames kernel lexer math.statistics memoize modern
+multiline parser sequences sequences.extras sets splitting
+stack-checker unicode words ;
 IN: modern.compiler
 
 : vocab>core2-path ( vocab -- path )
     ".private" ?tail drop
     "." split "/" join
-    [ "resource:core2/" prepend-path ] [ file-name ".factor" append append-path ] bi ; 
+    [ "resource:core2/" prepend-path ] [ file-name ".factor" append append-path ] bi ;
 
 : filter-using ( using -- using' )
     { "accessors" "threads.private" "threads" } diff ;
@@ -28,7 +29,7 @@ SYNTAX: STRING-M:
         scan-token scan-word parse-definition
         over changed-definition
         swap def>> first swapd set-at
-    ] with-definition ;    
+    ] with-definition ;
 >>
 
 STRING-DISPATCH: identifier-pass ( literal string -- assoc )
@@ -56,11 +57,11 @@ STRING-M: defer identifier-pass payload>> first tag>> 1array ;
 STRING-M: initialize identifier-pass payload>> first tag>> 1array ;
 STRING-M: startup-hook identifier-pass payload>> first tag>> 1array ;
 STRING-M: shutdown-hook identifier-pass payload>> first tag>> 1array ;
-    
+
 STRING-M: symbols identifier-pass "symbol" identifier-pass ;
 STRING-M: symbol identifier-pass
     payload>> [ tag>> ] map ;
-    
+
 STRING-M: slot identifier-pass
     payload>> [ tag>> ] map ;
 
@@ -68,7 +69,7 @@ STRING-M: mixin identifier-pass
     payload>> [ tag>> ] map
     dup [ "?" append ] map append ;
 
-STRING-M: singletons identifier-pass "singleton" identifier-pass ;    
+STRING-M: singletons identifier-pass "singleton" identifier-pass ;
 STRING-M: singleton identifier-pass
     payload>> [ tag>> ] map dup [ "?" append ] map append ;
 
@@ -110,11 +111,15 @@ M: decorator-literal literal>string-name f ;
 : literals>identifiers ( seq -- assoc )
     [ literal>string-name [ identifier-pass ] [ drop f ] if* ] map-zip ;
 
-TUPLE: manifest2 identifiers ;
+TUPLE: manifest2 name using in literals identifiers definitions ;
 
-: <manifest2> ( -- manifest2 )
+: <manifest2> ( literals -- manifest2 )
     manifest2 new
-        H{ } clone >>identifiers ; inline
+        swap >>literals
+        V{ } clone >>using
+        V{ } clone >>in
+        H{ } clone >>identifiers
+        H{ } clone >>definitions ; inline
 
 /*
 populate with existing primitives, builtins, bootstrap-only words
@@ -130,11 +135,25 @@ replace words in global dict, update existing words
 */
 
 : literals>manifest ( seq -- manifest )
-    [ <manifest2> ] dip {
-        [ literals>identifiers swap identifiers>> '[ [ _ push-at ] with each ] assoc-each ]
-        [ drop ]
-    } 2cleave ;
+    [ <manifest2> ] keep {
+        [ literals>identifiers over identifiers>> '[ [ _ push-at ] with each ] assoc-each ]
+        [ [ { [ uppercase-colon-literal? ] [ tag>> "IN" = ] } 1&& ] filter [ payload>> [ tag>> ] map ] map concat >>in ]
+        [ [ { [ uppercase-colon-literal? ] [ tag>> "USING" = ] } 1&& ] filter [ payload>> [ tag>> ] map ] map concat over using>> push-all ]
+        ! [ [ { [ uppercase-colon-literal? ] [ tag>> "USE" = ] } 1&& ] filter [ payload>> [ tag>> ] map ] map concat over using>> push-all ]
+    } cleave ;
 
+: manifests>namespace ( manifests -- namespace )
+    [
+        [ name>> ] [ identifiers>> keys ] bi
+        [ "." glue ] with map-zip
+    ] collect-by ;
+
+MEMO: load-modern ( vocab -- manifest )
+    [ vocab>core2-path path>literals literals>manifest ] keep >>name ;
+
+: load-modern-closure ( vocab -- manifests )
+    \ load-modern reset-memoized
+    load-modern [ using>> [ load-modern ] map ] closure ;
 
 /*
 core-vocabs [ vocab-words ] map-zip { length-test<=> } sort-values-by reverse
@@ -163,4 +182,11 @@ core-bootstrap-vocabs
 filter-using
 [ dup . flush vocab>core2-path path>literals literals>manifest ] map-zip
 ] map-zip
+
+
+clear "sequences" load-modern-closure members
+[ in>> ".private" tail? ] reject
+[ [ in>> ] [ identifiers>> keys ] bi ] { } map>assoc
+values concat histogram sort-values reverse 100 head
+
 */
