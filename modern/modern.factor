@@ -56,6 +56,15 @@ M: slice lexed-underlying ;
 TUPLE: compound-literal sequence ;
 CONSTRUCTOR: <compound-literal> compound-literal ( sequence -- obj ) ;
 
+! Ensure that we only have one decorated thing in a compound-literal
+ERROR: bad-compound-literal seq decorators words ;
+: check-compound-literal ( seq -- seq )
+    dup [ decorator-literal? ] partition dup length 1 = [
+        2drop
+    ] [
+        bad-compound-literal
+    ] if ;
+
 GENERIC: make-compound-literals ( seq -- seq' )
 M: object make-compound-literals ;
 M: array make-compound-literals
@@ -66,7 +75,7 @@ M: array make-compound-literals
             [ [ right-decorator-literal? ] [ ] bi* and ]
         } 2||
     ] monotonic-split
-    [ dup length 1 > [ <compound-literal> ] [ first ] if ] map ;
+    [ dup length 1 > [ check-compound-literal <compound-literal> ] [ first ] if ] map ;
 
 ! We have empty decorators, just the @ right here
 ! wrap the decorated object in the payload slot
