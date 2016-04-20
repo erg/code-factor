@@ -3,8 +3,8 @@
 USING: accessors arrays assocs combinators
 combinators.short-circuit definitions effects effects.parser fry
 graphs io.pathnames kernel lexer math.statistics memoize modern
-multiline parser sequences sequences.extras sets splitting
-stack-checker unicode words ;
+parser sequences sequences.extras sets splitting strings unicode
+words multiline ;
 IN: modern.compiler
 
 : vocab>core2-path ( vocab -- path )
@@ -68,17 +68,26 @@ TUPLE: builtin' < holder ;
 TUPLE: predicate' < holder ;
 TUPLE: union' < holder ;
 
+! generated definitions
+TUPLE: define' holder name ;
+TUPLE: generate-accessor' < define' ;
+TUPLE: generate-predicate' < define' ;
+
 : make-holder ( literal class -- obj )
     new
         swap >>literal ; inline
 
+GENERIC: base-literal ( obj -- obj )
+M: compound-literal base-literal
+    sequence>> [ decorator-literal? not ] find nip ;
+M: object base-literal ;
 
 GENERIC: literal>tag ( class -- string/f )
 M: line-comment-literal literal>tag drop f ;
 M: uppercase-colon-literal literal>tag
     tag>> [ "word" ] [ >lower ] if-empty ;
 M: compound-literal literal>tag
-    sequence>> [ decorator-literal? not ] find nip literal>tag ;
+    base-literal literal>tag ;
 
 : literal>holder ( literal -- obj )
     [ ] [
@@ -90,63 +99,96 @@ M: compound-literal literal>tag
 : literals>holders ( literals -- holders )
     [ literal>holder ] map ;
 
-GENERIC: holder>identifier ( literal -- assoc )
-M: using' holder>identifier drop f ;
-M: use' holder>identifier drop f ;
-M: in' holder>identifier drop f ;
-M: qualified-with' holder>identifier drop f ;
-M: qualified' holder>identifier drop f ;
-M: script' holder>identifier drop f ;
-M: m' holder>identifier drop f ;
-M: instance' holder>identifier drop f ;
+GENERIC: holder>definitions' ( literal -- assoc )
+M: comment' holder>definitions' drop f ;
+M: using' holder>definitions' drop f ;
+M: use' holder>definitions' drop f ;
+M: in' holder>definitions' drop f ;
+M: qualified-with' holder>definitions' drop f ;
+M: qualified' holder>definitions' drop f ;
+M: script' holder>definitions' drop f ;
+M: m' holder>definitions' drop f ;
+M: instance' holder>definitions' drop f ;
 
 ! Single words
-M: word' holder>identifier payload>> first tag>> ;
-M: generic' holder>identifier payload>> first tag>> ;
-M: generic#' holder>identifier payload>> first tag>> ;
-M: hook' holder>identifier payload>> first tag>> ;
-M: math' holder>identifier payload>> first tag>> ;
-M: constant' holder>identifier payload>> first tag>> ;
-M: c' holder>identifier payload>> first tag>> ;
-M: initialize' holder>identifier payload>> first tag>> ;
-M: startup-hook' holder>identifier payload>> first tag>> ;
-M: shutdown-hook' holder>identifier payload>> first tag>> ;
-M: primitive' holder>identifier payload>> first tag>> ;
-M: defer' holder>identifier payload>> first tag>> ;
+M: word' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: generic' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: generic#' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: math' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: constant' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: c' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: initialize' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: startup-hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: shutdown-hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: primitive' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: defer' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
 
 ! Multiple words
-M: symbols' holder>identifier  payload>> [ tag>> ] map ;
-M: symbol' holder>identifier payload>> [ tag>> ] map ;
-M: slot' holder>identifier payload>> [ tag>> ] map ;
+M: symbols' holder>definitions' dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ;
+M: symbol' holder>definitions'
+    dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ;
+M: slot' holder>definitions'
+    dup literal>> base-literal payload>> [ tag>> ] map
+    [ generate-accessor' boa ] with map ;
 
 ! these also make class predicate? words
-M: tuple' holder>identifier payload>> first tag>> ;
-M: error' holder>identifier payload>> first tag>> ;
-M: builtin' holder>identifier payload>> first tag>> ;
-M: predicate' holder>identifier payload>> first tag>> ;
-M: union' holder>identifier payload>> first tag>> ;
+
+GENERIC: slot-accessor-name ( obj -- string )
+M: single-matched-literal slot-accessor-name payload>> first tag>> ">>" append ;
+M: tag-literal slot-accessor-name ">>" append ;
+
+M: tuple' holder>definitions'
+    [ dup literal>> base-literal payload>> first tag>> define' boa ]
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ]
+    [
+        dup literal>> base-literal payload>> rest
+        [ slot-accessor-name generate-accessor' boa ] with map
+    ] tri [ 2array ] dip append ;
+
+M: error' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: builtin' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: predicate' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: union' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
 
 ! Multiple and class predicates
-M: mixin' holder>identifier payload>> [ tag>> ] map ;
-M: singletons' holder>identifier payload>> [ tag>> ] map ;
-M: singleton' holder>identifier payload>> [ tag>> ] map ;
+M: mixin' holder>definitions'
+    [ dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ]
+    [ dup literal>> base-literal payload>> [ tag>> "?" append ] map [ generate-predicate' boa ] with map ] bi append ;
 
+M: singletons' holder>definitions'
+    [ dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ]
+    [ dup literal>> base-literal payload>> [ tag>> "?" append ] map [ generate-predicate' boa ] with map ] bi append ;
 
-TUPLE: manifest2 name using in literals identifiers definitions ;
+M: singleton' holder>definitions'
+    [ dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ]
+    [ dup literal>> base-literal payload>> [ tag>> "?" append ] map [ generate-predicate' boa ] with map ] bi append ;
 
-: <manifest2> ( literals -- manifest2 )
+: holder>definitions ( obj -- seq )
+    holder>definitions' dup sequence? [ 1array ] unless ;
+
+: holders>definitions ( holders -- seq )
+    [ holder>definitions ] map concat ;
+
+GENERIC: add-predicates ( obj -- seq )
+M: string add-predicates dup "?" append 2array ;
+M: sequence add-predicates [ add-predicates ] map concat ;
+
+TUPLE: manifest2 name literals holders definitions namespaces ;
+
+: <manifest2> ( name literals holders definitions -- manifest2 )
     manifest2 new
+        swap >>definitions
+        swap >>holders
         swap >>literals
-        V{ } clone >>using
-        V{ } clone >>in
-        H{ } clone >>identifiers
-        H{ } clone >>definitions ; inline
+        swap >>name ; inline
 
-
-: literals>manifest ( seq -- manifest )
-    [ <manifest2> ] keep {
-        ! [ literals>identifiers over identifiers>> '[ [ _ push-at ] with each ] assoc-each ]
-    } cleave ;
+: manifest>definitions ( manifest -- namespace )
+    [ name>> ]
+    [ definitions>> [ name>> ] map ] bi
+    [ ":" glue ] with map ;
 
 : manifests>namespace ( manifests -- namespace )
     [
@@ -162,9 +204,18 @@ TUPLE: manifest2 name using in literals identifiers definitions ;
     [ in'? ] filter
     [ literal>> payload>> [ tag>> ] map ] map concat ;
 
-MEMO: load-modern ( vocab -- literals )
-    vocab>core2-path path>literals literals>holders ;
+MEMO: load-modern ( name -- literals )
+    dup vocab>core2-path path>literals
+    dup literals>holders
+    dup holders>definitions <manifest2> ;
 
 : load-modern-closure ( vocab -- manifests )
     \ load-modern reset-memoized
     load-modern [ holders>using [ load-modern ] map ] closure ;
+
+/*
+"sequences" load-modern
+[ holder>definitions ] map sift
+[ dup array? [ [ name>> ] map ] [ name>> ] if ] map flatten
+describe
+*/
