@@ -4,7 +4,7 @@ USING: accessors arrays assocs combinators
 combinators.short-circuit definitions effects effects.parser fry
 graphs io.pathnames kernel lexer math.statistics memoize modern
 parser sequences sequences.extras sets splitting strings unicode
-words multiline ;
+words multiline classes.mixin quotations ;
 IN: modern.compiler
 
 : vocab>core2-path ( vocab -- path )
@@ -222,10 +222,30 @@ M: singleton' holder>definitions'
 GENERIC: lookup-literal ( namespace literal -- obj )
 
 
-GENERIC: definition>quotation ( namespace definition -- quot )
+GENERIC: definition>quotation ( namespace name definition -- quot )
 M: define' definition>quotation
-    2drop [ ]
+    holder>> definition>quotation
     ;
+
+
+GENERIC: make-predicate-definition ( namespace name obj -- obj' )
+
+M: mixin' make-predicate-definition
+    3drop "omg!???" ;
+
+M: generate-predicate' definition>quotation
+    holder>> make-predicate-definition
+    ;
+
+
+M: word' definition>quotation
+    drop nip 1quotation ;
+M: mixin' definition>quotation
+    ! literal>> base-literal payload>> first tag>> >string
+    drop nip '[ _ define-mixin-class ] ;
+
+M: object definition>quotation
+    3drop [ ] ;
 
 : manifest>scoped-words ( manifest -- seq )
     [ name>> ] [ definition-assoc>> keys ] bi
@@ -245,7 +265,7 @@ DEFER: load-modern
 
 : manifest>quotations ( manifest -- quots )
     [ manifest>combined-namespace ] [ definitions>> ] bi
-    [ definition>quotation ] with { } map-as ;
+    [ [ name>> ] [ ] bi definition>quotation ] with { } map-as ;
 
 GENERIC: add-predicates ( obj -- seq )
 M: string add-predicates dup "?" append 2array ;
@@ -272,11 +292,16 @@ TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
         [ "." glue ] with map-zip
     ] collect-by ;
 
+: literals>manifest ( name/f literals -- manifest )
+    dup literals>holders
+    dup holders>definitions <manifest2> ;
+
+: string>manifest ( string -- manifest )
+    string>literals f swap literals>manifest ;
 
 MEMO: load-modern ( name -- literals )
     dup vocab>core2-path path>literals
-    dup literals>holders
-    dup holders>definitions <manifest2> ;
+    literals>manifest ;
 
 : load-modern-closure ( vocab -- manifests )
     \ load-modern reset-memoized
