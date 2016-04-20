@@ -77,10 +77,21 @@ TUPLE: generate-predicate' < define' ;
     new
         swap >>literal ; inline
 
+GENERIC: split-decorators ( seq -- base left right )
+M: compound-literal split-decorators
+    sequence>>
+    [ decorator-literal? not ] partition
+    [ left-decorator-literal? ] partition ;
+M: object split-decorators f f ;
+
+! GENERIC: apply-decorator ( base decorator -- )
+! : apply-decorators ( obj seq -- obj ) ;
+
 GENERIC: base-literal ( obj -- obj )
 M: compound-literal base-literal
     sequence>> [ decorator-literal? not ] find nip ;
 M: object base-literal ;
+
 
 GENERIC: literal>tag ( class -- string/f )
 M: line-comment-literal literal>tag drop f ;
@@ -115,19 +126,30 @@ M: word' holder>definitions'
     dup literal>> base-literal payload>> first tag>> define' boa ;
 M: generic' holder>definitions'
     dup literal>> base-literal payload>> first tag>> define' boa ;
-M: generic#' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: math' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: constant' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: c' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: initialize' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: startup-hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: shutdown-hook' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: primitive' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: defer' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: generic#' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: hook' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: math' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: constant' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: c' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: initialize' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: startup-hook' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: shutdown-hook' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: primitive' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
+M: defer' holder>definitions'
+    dup literal>> base-literal payload>> first tag>> define' boa ;
 
 ! Multiple words
-M: symbols' holder>definitions' dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ;
+M: symbols' holder>definitions'
+    dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ;
 M: symbol' holder>definitions'
     dup literal>> base-literal payload>> [ tag>> ] map [ define' boa ] with map ;
 M: slot' holder>definitions'
@@ -137,8 +159,9 @@ M: slot' holder>definitions'
 ! these also make class predicate? words
 
 GENERIC: slot-accessor-name ( obj -- string )
-M: single-matched-literal slot-accessor-name payload>> first tag>> ">>" append ;
-M: tag-literal slot-accessor-name ">>" append ;
+M: single-matched-literal slot-accessor-name
+    payload>> first tag>> ">>" append ;
+M: tag-literal slot-accessor-name tag>> ">>" append ;
 
 M: tuple' holder>definitions'
     [ dup literal>> base-literal payload>> first tag>> define' boa ]
@@ -148,10 +171,23 @@ M: tuple' holder>definitions'
         [ slot-accessor-name generate-accessor' boa ] with map
     ] tri [ 2array ] dip append ;
 
-M: error' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: builtin' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: predicate' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
-M: union' holder>definitions' dup literal>> base-literal payload>> first tag>> define' boa ;
+M: error' holder>definitions'
+    [ dup literal>> base-literal payload>> first tag>> define' boa ]
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ]
+    [
+        dup literal>> base-literal payload>> rest
+        [ slot-accessor-name generate-accessor' boa ] with map
+    ] tri [ 2array ] dip append ;
+
+M: builtin' holder>definitions'
+    [ dup literal>> base-literal payload>> first tag>> define' boa ]
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
+M: predicate' holder>definitions'
+    [ dup literal>> base-literal payload>> first tag>> define' boa ]
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
+M: union' holder>definitions'
+    [ dup literal>> base-literal payload>> first tag>> define' boa ]
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
 
 ! Multiple and class predicates
 M: mixin' holder>definitions'
@@ -176,11 +212,12 @@ GENERIC: add-predicates ( obj -- seq )
 M: string add-predicates dup "?" append 2array ;
 M: sequence add-predicates [ add-predicates ] map concat ;
 
-TUPLE: manifest2 name literals holders definitions namespaces ;
+TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
 
-: <manifest2> ( name literals holders definitions -- manifest2 )
+: <manifest2> ( name literals holders definitions  -- manifest2 )
     manifest2 new
         swap >>definitions
+        dup definitions>> [ [ name>> ] keep ] { } map>assoc >>definition-assoc
         swap >>holders
         swap >>literals
         swap >>name ; inline
@@ -204,6 +241,7 @@ TUPLE: manifest2 name literals holders definitions namespaces ;
     [ in'? ] filter
     [ literal>> payload>> [ tag>> ] map ] map concat ;
 
+
 MEMO: load-modern ( name -- literals )
     dup vocab>core2-path path>literals
     dup literals>holders
@@ -212,6 +250,7 @@ MEMO: load-modern ( name -- literals )
 : load-modern-closure ( vocab -- manifests )
     \ load-modern reset-memoized
     load-modern [ holders>using [ load-modern ] map ] closure ;
+
 
 /*
 "sequences" load-modern
