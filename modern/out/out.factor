@@ -19,6 +19,8 @@ GENERIC: write-literal ( obj -- )
 M: string write-literal write ;
 M: slice write-literal [ write-whitespace ] [ write ] bi ;
 
+M: array write-literal [ write-literal ] each ;
+
 M: tag-literal write-literal
     {
         [ seq>> 0 swap nth write-whitespace ]

@@ -1,10 +1,10 @@
 ! Copyright (C) 2016 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors arrays assocs combinators
+USING: accessors arrays assocs classes.mixin combinators
 combinators.short-circuit definitions effects effects.parser fry
-graphs io.pathnames kernel lexer math.statistics memoize modern
-parser sequences sequences.extras sets splitting strings unicode
-words multiline classes.mixin quotations ;
+graphs io.pathnames kernel lexer locals math math.statistics
+memoize modern multiline parser quotations sequences
+sequences.extras sets splitting strings unicode words ;
 IN: modern.compiler
 
 : vocab>core2-path ( vocab -- path )
@@ -218,8 +218,43 @@ M: singleton' holder>definitions'
     [ in'? ] filter
     [ literal>> payload>> [ tag>> ] map ] map concat ;
 
+GENERIC: handle-colon-tag ( seq tag -- obj )
+GENERIC: handle-paren-tag ( seq tag -- obj )
+M: f handle-paren-tag drop { "--" } split1 { } or <effect> ;
+GENERIC: handle-brace-tag ( seq tag -- obj )
+GENERIC: handle-bracket-tag ( seq tag -- obj )
+GENERIC: handle-string-tag ( seq tag -- obj )
 
-GENERIC: lookup-literal ( namespace literal -- obj )
+ERROR: word-not-found word ;
+: lookup-in-namespace ( key namespace -- obj/f )
+    ?at [
+    ] [
+        word-not-found
+    ] if ;
+
+GENERIC# lookup-literal 1 ( literal namespace -- obj )
+
+M: tag-literal lookup-literal
+    [ tag>> ] dip lookup-in-namespace ;
+
+: lookup-sequence ( seq namespace -- obj )
+    '[ _ lookup-literal ] map ;
+
+ERROR: unknown-tag tag ;
+
+ERROR: unknown-single-matched-delimiter sequence tag ch ;
+M: single-matched-literal lookup-literal
+    [ [ payload>> ] dip lookup-sequence ]
+    [ [ tag>> ] dip over empty? [ 2drop f ] [ lookup-literal ] if ]
+    [ drop delimiter>> ] 2tri
+    {
+        { "(" [ handle-paren-tag ] }
+        { "{" [ handle-brace-tag ] }
+        { "[" [ handle-bracket-tag ] }
+        { ":" [ handle-colon-tag ] }
+        { "\"" [ handle-string-tag ] }
+        [ unknown-single-matched-delimiter ]
+    } case ;
 
 
 GENERIC: definition>quotation ( namespace name definition -- quot )
@@ -228,18 +263,35 @@ M: define' definition>quotation
     ;
 
 
-GENERIC: make-predicate-definition ( namespace name obj -- obj' )
+! Done by update-classes
+M: generate-predicate' definition>quotation 3drop f ;
 
-M: mixin' make-predicate-definition
-    3drop "omg!???" ;
 
-M: generate-predicate' definition>quotation
-    holder>> make-predicate-definition
+GENERIC: stack-effect? ( obj -- ? )
+M: single-matched-literal stack-effect? { [ tag>> ] [ delimiter>> "(" = ] } 1&& ;
+M: object stack-effect? drop f ;
+
+ERROR: word-expects-stack-effect  ;
+: ensure-stack-effect ( obj -- ? )
+    dup stack-effect? [ word-expects-stack-effect ] unless ;
+
+ERROR: word-expects-name-effect-body payload ;
+: name-effect-body ( payload -- name effect body )
+    payload>> dup length 2 < [ word-expects-name-effect-body ] when
+    [ first2 ensure-stack-effect ] [ 2 tail ] bi ;
+
+: body>quotation ( body namespace -- quot )
+    2drop [ ] 
     ;
 
+M:: word' definition>quotation ( namespace name definition -- quot )
+    definition literal>> base-literal
+    name-effect-body :> ( name' effect body )
+    name
+    body namespace body>quotation
+    effect namespace lookup-literal
+    '[ _ _ _ define-declared ] ;
 
-M: word' definition>quotation
-    drop nip 1quotation ;
 M: mixin' definition>quotation
     ! literal>> base-literal payload>> first tag>> >string
     drop nip '[ _ define-mixin-class ] ;
@@ -263,9 +315,9 @@ DEFER: load-modern
     [ manifest>using [ load-modern manifest>own-namespace ] map sift members H{ } clone [ assoc-union ] reduce ]
     [ manifest>own-namespace ] bi assoc-union ;
 
-: manifest>quotations ( manifest -- quots )
+: manifest>quotation ( manifest -- quot )
     [ manifest>combined-namespace ] [ definitions>> ] bi
-    [ [ name>> ] [ ] bi definition>quotation ] with { } map-as ;
+    [ [ name>> ] [ ] bi definition>quotation ] with { } map-as concat ;
 
 GENERIC: add-predicates ( obj -- seq )
 M: string add-predicates dup "?" append 2array ;
