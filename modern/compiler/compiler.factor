@@ -81,6 +81,7 @@ GENERIC: split-decorators ( seq -- base left right )
 M: compound-literal split-decorators
     sequence>>
     [ decorator-literal? not ] partition
+    [ first ] dip
     [ left-decorator-literal? ] partition ;
 M: object split-decorators f f ;
 
@@ -181,13 +182,13 @@ M: error' holder>definitions'
 
 M: builtin' holder>definitions'
     [ dup literal>> base-literal payload>> first tag>> define' boa ]
-    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi 2array ;
 M: predicate' holder>definitions'
     [ dup literal>> base-literal payload>> first tag>> define' boa ]
-    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi 2array ;
 M: union' holder>definitions'
     [ dup literal>> base-literal payload>> first tag>> define' boa ]
-    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi append ;
+    [ dup literal>> base-literal payload>> first tag>> "?" append generate-predicate' boa ] bi 2array ;
 
 ! Multiple and class predicates
 M: mixin' holder>definitions'
@@ -208,6 +209,44 @@ M: singleton' holder>definitions'
 : holders>definitions ( holders -- seq )
     [ holder>definitions ] map concat ;
 
+
+: holders>using ( holders -- using )
+    [ { [ using'? ] [ use'? ] } 1|| ] filter
+    [ literal>> payload>> [ tag>> ] map ] map concat ;
+
+: holders>in ( holders -- using )
+    [ in'? ] filter
+    [ literal>> payload>> [ tag>> ] map ] map concat ;
+
+
+GENERIC: lookup-literal ( namespace literal -- obj )
+
+
+GENERIC: definition>quotation ( namespace definition -- quot )
+M: define' definition>quotation
+    2drop [ ]
+    ;
+
+: manifest>scoped-words ( manifest -- seq )
+    [ name>> ] [ definition-assoc>> keys ] bi
+    [ ":" glue ] with map ;
+
+: manifest>own-namespace ( manifest -- namespace )
+    [ definition-assoc>> keys ] [ manifest>scoped-words [ 1array ] map ] bi
+    zip ;
+
+: manifest>using ( manifest -- seq )
+    holders>> holders>using ;
+
+DEFER: load-modern
+: manifest>combined-namespace ( manifest -- namespaces )
+    [ manifest>using [ load-modern manifest>own-namespace ] map sift members H{ } clone [ assoc-union ] reduce ]
+    [ manifest>own-namespace ] bi assoc-union ;
+
+: manifest>quotations ( manifest -- quots )
+    [ manifest>combined-namespace ] [ definitions>> ] bi
+    [ definition>quotation ] with { } map-as ;
+
 GENERIC: add-predicates ( obj -- seq )
 M: string add-predicates dup "?" append 2array ;
 M: sequence add-predicates [ add-predicates ] map concat ;
@@ -220,7 +259,7 @@ TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
         dup definitions>> [ [ name>> ] keep ] { } map>assoc >>definition-assoc
         swap >>holders
         swap >>literals
-        swap >>name ; inline
+        swap ".private" ?tail drop >>name ; inline
 
 : manifest>definitions ( manifest -- namespace )
     [ name>> ]
@@ -232,14 +271,6 @@ TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
         [ name>> ] [ identifiers>> keys ] bi
         [ "." glue ] with map-zip
     ] collect-by ;
-
-: holders>using ( holders -- using )
-    [ { [ using'? ] [ use'? ] } 1|| ] filter
-    [ literal>> payload>> [ tag>> ] map ] map concat ;
-
-: holders>in ( holders -- using )
-    [ in'? ] filter
-    [ literal>> payload>> [ tag>> ] map ] map concat ;
 
 
 MEMO: load-modern ( name -- literals )
@@ -257,4 +288,11 @@ MEMO: load-modern ( name -- literals )
 [ holder>definitions ] map sift
 [ dup array? [ [ name>> ] map ] [ name>> ] if ] map flatten
 describe
+
+
+clear
+"sequences" load-modern
+definitions>> [ define'? ] filter
+[ holder>> word'? ] filter
+first
 */
