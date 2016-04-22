@@ -46,6 +46,9 @@ TUPLE: whitespace-literal < tag-literal ;
 
 TUPLE: left-decorator-literal < decorator-literal ;
 TUPLE: right-decorator-literal < decorator-literal ;
+
+TUPLE: compound-sequence-literal sequence ;
+CONSTRUCTOR: <compound-sequence-literal> compound-sequence-literal ( sequence -- obj ) ;
 >>
 
 GENERIC: lexed-underlying ( obj -- slice )
@@ -97,7 +100,12 @@ M: array collapse-decorators
     ] map ;
 
 : split-double-dash ( seq -- seqs )
-    [ { [ tag-literal? ] [ tag>> "--" = ] } 1&& ] split-when ;
+    dup [ { [ tag-literal? ] [ tag>> "--" = ] } 1&& ] split-when
+    dup length 1 > [
+        nip <compound-sequence-literal>
+    ] [
+        drop
+    ] if ;
 
 : postprocess-lexed ( seq -- seq' )
     collapse-decorators make-compound-literals ;
@@ -138,7 +146,7 @@ ERROR: mismatched-closing opening closing ;
 :: make-matched-literal ( payload closing tag opening-delimiter class -- literal )
     class new
         tag >string >>tag
-        payload postprocess-lexed split-double-dash >>payload
+        payload postprocess-lexed opening-delimiter "\"" = [ split-double-dash ] unless >>payload
         tag closing [ dup tag-literal? [ lexed-underlying ] when ] bi@ ?span-slices >>underlying
         opening-delimiter >string >>delimiter
         dup single-matched-literal? [

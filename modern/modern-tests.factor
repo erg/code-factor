@@ -89,16 +89,6 @@ IN: modern.tests
 ! ] unit-test
 
 
-! { { "1" "2" "+" } }
-! [ "[1 2 +]" string>literals first payload>> [ >string ] map ] unit-test
-
-! { { "1" "2" "+" } }
-! [ "{1 2 +}" string>literals first payload>> [ >string ] map ] unit-test
-
-! { { "1" "2" "+" } }
-! [ "(1 2 +)" string>literals first payload>> [ >string ] map ] unit-test
-
-
 { 1 } [ "a@ b@ hi @c @d" string>literals length ] unit-test
 
 { 1 } [ "{ 1 }@ { 2 }@ hi @{ 3 } @{ 4 }" string>literals length ] unit-test

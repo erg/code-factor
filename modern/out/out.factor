@@ -4,7 +4,7 @@ USING: accessors combinators combinators.short-circuit
 combinators.smart continuations fry io io.encodings.utf8
 io.files io.streams.string kernel modern modern.paths
 modern.slices multiline namespaces prettyprint sequences sets
-splitting strings ;
+splitting strings arrays ;
 IN: modern.out
 
 SYMBOL: last-slice
@@ -129,6 +129,9 @@ M: right-decorator-literal write-literal
 M: compound-literal write-literal
     sequence>> [ write-literal ] each ;
 
+M: compound-sequence-literal write-literal
+    sequence>> [ write-literal ] each ;
+
 ! Swap in write-literal for renaming
 
 : write-modern-loop ( quot -- )
@@ -142,7 +145,12 @@ M: compound-literal write-literal
 
 : map-literals ( obj quot: ( obj -- obj' ) -- seq )
     over single-matched-literal? [
-        [ call drop ] [ '[ [ _ map-literals ] map ] change-payload ] 2bi
+        [ call drop ] [
+            '[
+                dup compound-sequence-literal? [ sequence>> ] when
+                [ _ map-literals ] map
+            ] change-payload
+        ] 2bi
     ] [
         call
     ] if ; inline recursive

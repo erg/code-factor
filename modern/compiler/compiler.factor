@@ -220,7 +220,7 @@ M: singleton' holder>definitions'
 
 GENERIC: handle-colon-tag ( seq tag -- obj )
 GENERIC: handle-paren-tag ( seq tag -- obj )
-M: f handle-paren-tag drop { "--" } split1 { } or <effect> ;
+! M: f handle-paren-tag drop <effect> ;
 GENERIC: handle-brace-tag ( seq tag -- obj )
 GENERIC: handle-bracket-tag ( seq tag -- obj )
 GENERIC: handle-string-tag ( seq tag -- obj )
