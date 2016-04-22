@@ -299,6 +299,16 @@ M: mixin' definition>quotation
 M: object definition>quotation
     3drop [ ] ;
 
+TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
+
+: <manifest2> ( name literals holders definitions  -- manifest2 )
+    manifest2 new
+        swap >>definitions
+        dup definitions>> [ [ name>> ] keep ] { } map>assoc >>definition-assoc
+        swap >>holders
+        swap >>literals
+        swap ".private" ?tail drop >>name ; inline
+
 : manifest>scoped-words ( manifest -- seq )
     [ name>> ] [ definition-assoc>> keys ] bi
     [ ":" glue ] with map ;
@@ -323,26 +333,11 @@ GENERIC: add-predicates ( obj -- seq )
 M: string add-predicates dup "?" append 2array ;
 M: sequence add-predicates [ add-predicates ] map concat ;
 
-TUPLE: manifest2 name literals holders definitions definition-assoc namespaces ;
-
-: <manifest2> ( name literals holders definitions  -- manifest2 )
-    manifest2 new
-        swap >>definitions
-        dup definitions>> [ [ name>> ] keep ] { } map>assoc >>definition-assoc
-        swap >>holders
-        swap >>literals
-        swap ".private" ?tail drop >>name ; inline
 
 : manifest>definitions ( manifest -- namespace )
     [ name>> ]
     [ definitions>> [ name>> ] map ] bi
     [ ":" glue ] with map ;
-
-: manifests>namespace ( manifests -- namespace )
-    [
-        [ name>> ] [ identifiers>> keys ] bi
-        [ "." glue ] with map-zip
-    ] collect-by ;
 
 : literals>manifest ( name/f literals -- manifest )
     dup literals>holders
