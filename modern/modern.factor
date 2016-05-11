@@ -280,7 +280,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     2over ?nth CHAR: [ = [
         [ 1 + ] 2dip 2over ?nth read-double-matched-bracket
     ] [
-        [ slice-til-eol-from drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
+        [ slice-til-eol drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
     ] if ;
 
 : read-til-semicolon ( n string slice -- n' string semi )
