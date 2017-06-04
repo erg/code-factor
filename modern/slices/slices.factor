@@ -176,7 +176,7 @@ ERROR: unexpected-end n string ;
 ERROR: subseq-expected-but-got-eof n string expected ;
 
 :: slice-til-string ( n string search --  n' string payload end-string )
-    search string n start* :> n'
+    search string n subseq-start-from :> n'
     n' [ n string search subseq-expected-but-got-eof ] unless
     n' search length +  string
     n n' string ?<slice>
