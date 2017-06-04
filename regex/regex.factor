@@ -1,13 +1,11 @@
 ! Copyright (C) 2010 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors arrays assocs combinators
-combinators.short-circuit constructors fry interval-maps kernel
-locals make math math.parser memoize namespaces regexp.classes
-sequences sets splitting strings unicode unicode.script unicode.data ;
+USING: accessors arrays assocs character-parser combinators
+combinators.short-circuit constructors fry hashtables
+interval-maps kernel locals make math math.parser memoize
+namespaces regexp.classes sequences sets splitting strings
+unicode unicode.data unicode.script ;
 IN: regex
-
-TUPLE: character-parser string { n integer initial: 0 } ;
-CONSTRUCTOR: <character-parser> character-parser ( string -- obj ) ;
 
 TUPLE: regex-tree
     string
@@ -20,6 +18,7 @@ CONSTRUCTOR: <regex-tree> regex-tree ( string -- obj )
     dup string>> <character-parser> >>character-parser
     V{ } clone >>stack
     V{ } clone >>character-classes ;
+
 TUPLE: concatenation seq ;
 CONSTRUCTOR: <concatenation> concatenation ( seq -- obj ) ;
 TUPLE: alternation seq ;
@@ -56,62 +55,6 @@ unmatchable-class terminator-class word-boundary-class ;
 SINGLETONS: beginning-of-input ^ end-of-input $ end-of-file
 ^unix $unix word-break ;
 
-: character-parser ( -- obj ) \ regex-tree get character-parser>> ;
-: still-parsing? ( ? -- ? )
-    {
-        [ ]
-        [ drop character-parser [ n>> ] [ string>> length ] bi < ]
-    } 1&& ;
-
-: current ( -- ch ) character-parser [ n>> ] [ string>> ] bi nth ;
-: advance ( -- ) character-parser [ 1 + ] change-n drop ;
-: lookahead1 ( -- ch/f )
-    character-parser [ n>> 1 + ] [ string>> ] bi 2dup bounds-check? [ nth ] [ 2drop f ] if ;
-: lookahead2 ( -- ch/f )
-    character-parser [ n>> 2 + ] [ string>> ] bi 2dup bounds-check? [ nth ] [ 2drop f ] if ;
-
-: ?subseq ( from to seq -- subseq/f )
-    2dup [ 1 - ] dip bounds-check? [ subseq ] [ nip swap tail f like ] if ;
-
-: ?last ( seq -- elt/f ) [ length 1 - ] [ ?nth ] bi ;
-
-: lookahead ( n -- string/f )
-    [ character-parser n>> dup ] dip + character-parser string>> ?subseq ;
-
-: advance-n ( n -- )
-    [ character-parser ] dip '[ _ + ] change-n drop ;
-
-ERROR: expected regex-parser string ;
-
-:: expect ( string -- )
-    string
-    string length lookahead = [
-        string length advance-n
-    ] [
-        character-parser string expected
-    ] if ;
-
-: take ( n -- string )
-    [ lookahead ] [ advance-n ] bi ;
-
-:: take? ( string -- string )
-    string length lookahead string =
-    [ string length advance-n t ] [ f ] if ;
-
-: take-while ( quot -- string )
-    '[
-        [ @ [ [ current , advance ] when ] keep ] loop
-    ] "" make ; inline
-
-: take-integer ( -- integer/f )
-    [ current digit? ] take-while string>number ;
-
-: take-alpha ( -- integer/f )
-    [ current Letter? ] take-while ;
-
-: take-character-class ( -- string )
-    "[:" expect [ current letter? ] take-while ":" expect ;
-
 : regex-tree ( -- regex-tree ) \ regex-tree get ;
 : stack ( -- seq ) regex-tree stack>> ;
 : push-regex-tree ( obj -- ) stack push ;
@@ -121,17 +64,14 @@ ERROR: expected regex-parser string ;
 : pop-current-regex ( -- obj ) current-regex pop ;
 : peek1 ( -- obj/f ) current-regex [ length 1 - ] keep ?nth ;
 : peek2 ( -- obj/f ) current-regex [ length 2 - ] keep ?nth ;
-: unless-alternation ( quot -- )
-    [ peek2 alternation = ] dip unless ; inline
 : stack1 ( word -- )
-    '[ pop-current-regex _ execute( obj -- obj ) push-current-regex ] unless-alternation ;
+    [ pop-current-regex ] dip execute( obj -- obj ) push-current-regex ;
 : stack2 ( word -- )
-    '[
-        current-regex length 1 > [
-            pop-current-regex pop-current-regex swap
-            _ execute( obj obj -- obj ) push-current-regex
-        ] when
-    ] unless-alternation ;
+    [ current-regex length 1 > ] dip '[
+        pop-current-regex pop-current-regex swap
+        _ execute( obj obj -- obj ) push-current-regex
+    ] when ;
+
 : new-nested-regex ( -- )
     V{ } clone push-regex-tree ;
 
@@ -454,31 +394,34 @@ ERROR: bad-number ;
     ] unless ;
 
 ! # is a comment in free-space mode
-: parse-char ( ch -- ? )
+: parse-char ( ch -- )
     {
-        { CHAR: . [ dot push-current-regex t advance ] }
-        { CHAR: \ [ parse-escape push-current-regex t ] }
-        { CHAR: ? [ \ <maybe> stack1 t advance ] }
-        { CHAR: * [ \ <star> stack1 t advance ] }
-        { CHAR: + [ \ <plus> stack1 t advance ] }
-        { CHAR: | [ \ alternation push-current-regex t advance ] }
-        { CHAR: [ [ parse-character-class t ] }
-        { CHAR: ( [ advance parse-nested-regex t ] }
-        { CHAR: ) [ check-balance finish-nested-regex f advance ] }
-        { CHAR: { [ parse-repetition t ] }
-        { CHAR: ^ [ ^ <tagged-epsilon> push-current-regex t advance ] }
-        { CHAR: $ [ $ <tagged-epsilon> push-current-regex t advance ] }
-        [ <character> push-current-regex t advance ]
+        { CHAR: . [ dot push-current-regex advance ] }
+        { CHAR: \ [ parse-escape push-current-regex ] }
+        { CHAR: ? [ \ <maybe> stack1 advance ] }
+        { CHAR: * [ \ <star> stack1 advance ] }
+        { CHAR: + [ \ <plus> stack1 advance ] }
+        { CHAR: | [ \ alternation push-current-regex advance ] }
+        { CHAR: [ [ parse-character-class ] }
+        { CHAR: ( [ advance parse-nested-regex ] }
+        { CHAR: ) [ check-balance finish-nested-regex advance ] }
+        { CHAR: { [ parse-repetition ] }
+        { CHAR: ^ [ ^ <tagged-epsilon> push-current-regex advance ] }
+        { CHAR: $ [ $ <tagged-epsilon> push-current-regex advance ] }
+        [ <character> push-current-regex advance ]
     } case ;
 
 : parse-regex ( string -- tree )
-    <regex-tree> \ regex-tree [
+    <regex-tree>
+    [ \ regex-tree associate ]
+    [ character-parser>> \ character-parser pick set-at ] bi
+    [
         parse-new-regex
         pop-regex-tree
         stack empty? [ regex-tree unbalanced-regex ] unless
         finalize regex-tree regex-tree<<
         regex-tree
-    ] with-variable ;
+    ] with-variables ;
 
 : or-regex-trees ( seq -- seq' )
     [ stack>> first ] map <alternation> ;

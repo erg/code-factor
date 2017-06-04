@@ -1,17 +1,17 @@
 ! Copyright (C) 2015 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors combinators.short-circuit constructors fry
-kernel locals make math sequences ;
+kernel locals make math math.parser namespaces regex sequences
+unicode ;
 IN: character-parser
 
 TUPLE: character-parser string { n integer initial: 0 } ;
 CONSTRUCTOR: <character-parser> character-parser ( string -- obj ) ;
 
-: still-parsing? ( ? -- ? )
-    {
-        [ ]
-        [ drop character-parser [ n>> ] [ string>> length ] bi < ]
-    } 1&& ;
+: character-parser ( -- obj ) \ regex-tree get character-parser>> ;
+
+: still-parsing? ( -- ? )
+    character-parser [ n>> ] [ string>> length ] bi < ;
 
 : current ( -- ch ) character-parser [ n>> ] [ string>> ] bi nth ;
 : advance ( -- ) character-parser [ 1 + ] change-n drop ;
@@ -23,7 +23,7 @@ CONSTRUCTOR: <character-parser> character-parser ( string -- obj ) ;
 : ?subseq ( from to seq -- subseq/f )
     2dup [ 1 - ] dip bounds-check? [ subseq ] [ nip swap tail f like ] if ;
 
-: ?last ( seq -- elt/f ) [ length 1 - ] [ ?nth ] bi ;
+! : ?last ( seq -- elt/f ) [ length 1 - ] [ ?nth ] bi ;
     
 : lookahead ( n -- string/f )
     [ character-parser n>> dup ] dip + character-parser string>> ?subseq ;
@@ -52,4 +52,14 @@ ERROR: expected regexp-parser string ;
     '[
         [ @ [ [ current , advance ] when ] keep ] loop
     ] "" make ; inline
+
+
+: take-integer ( -- integer/f )
+    [ current digit? ] take-while string>number ;
+
+: take-alpha ( -- integer/f )
+    [ current Letter? ] take-while ;
+
+: take-character-class ( -- string )
+    "[:" expect [ current letter? ] take-while ":" expect ;
 

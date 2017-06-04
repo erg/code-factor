@@ -9,3 +9,4 @@ IN: regex.tests
 { t } [ "abc" [ concatenation? ] regex-expect ] unit-test
 { t } [ "a|b|c" [ alternation? ] regex-expect ] unit-test
 { t } [ "[abc]" [ character-class? ] regex-expect ] unit-test
+{ t } [ "a|b*" [ alternation? ] regex-expect ] unit-test
