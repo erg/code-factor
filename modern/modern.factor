@@ -186,7 +186,7 @@ MACRO:: read-double-matched ( open-ch -- quot: ( n string tag ch -- n' string se
     } 2cleave :> ( openstr2 openstr1 closestr2 )
     [| n string tag! ch |
         ch {
-            { CHAR: = [
+            { char: = [
                 n string openstr1 slice-til-separator-inclusive [ -1 modify-from ] dip :> ( n' string' opening ch )
                 ch open-ch = [ tag openstr2 n string ch long-opening-mismatch ] unless
                 opening matching-delimiter-string :> needle
@@ -205,9 +205,9 @@ MACRO:: read-double-matched ( open-ch -- quot: ( n string tag ch -- n' string se
         } case
      ] ;
 
-: read-double-matched-paren ( n string tag ch -- n' string seq ) CHAR: ( read-double-matched ;
-: read-double-matched-bracket ( n string tag ch -- n' string seq ) CHAR: [ read-double-matched ;
-: read-double-matched-brace ( n string tag ch -- n' string seq ) CHAR: { read-double-matched ;
+: read-double-matched-paren ( n string tag ch -- n' string seq ) char: ( read-double-matched ;
+: read-double-matched-bracket ( n string tag ch -- n' string seq ) char: [ read-double-matched ;
+: read-double-matched-brace ( n string tag ch -- n' string seq ) char: { read-double-matched ;
 
 DEFER: lex
 DEFER: lex-factor
@@ -247,9 +247,9 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
         } cond
     ] ;
 
-: read-bracket ( n string slice -- n' string slice' ) CHAR: [ read-matched ;
-: read-brace ( n string slice -- n' string slice' ) CHAR: { read-matched ;
-: read-paren ( n string slice -- n' string slice' ) CHAR: ( read-matched ;
+: read-bracket ( n string slice -- n' string slice' ) char: [ read-matched ;
+: read-brace ( n string slice -- n' string slice' ) char: { read-matched ;
+: read-paren ( n string slice -- n' string slice' ) char: ( read-matched ;
 
 : read-backtick ( n string opening -- n' string obj )
     [
@@ -259,10 +259,10 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
 
 : read-string-payload ( n string -- n' string )
     over [
-        { CHAR: \ CHAR: " } slice-til-separator-inclusive {
+        { char: \ char: " } slice-til-separator-inclusive {
             { f [ drop ] }
-            { CHAR: " [ drop ] }
-            { CHAR: \ [ drop next-char-from drop read-string-payload ] }
+            { char: " [ drop ] }
+            { char: \ [ drop next-char-from drop read-string-payload ] }
         } case
     ] [
         string-expected-got-eof
@@ -277,7 +277,7 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     tag 1 cut-slice* dquote-literal make-matched-literal ;
 
 : take-comment ( n string slice -- n' string comment )
-    2over ?nth CHAR: [ = [
+    2over ?nth char: [ = [
         [ 1 + ] 2dip 2over ?nth read-double-matched-bracket
     ] [
         [ slice-til-eol drop dup ] dip 1 cut-slice* line-comment-literal make-delimited-literal
@@ -299,12 +299,12 @@ MACRO:: read-matched ( ch -- quot: ( n string tag -- n' string slice' ) )
     lowercase-colon-literal make-delimited-literal ;
 
 : strict-upper? ( string -- ? )
-    [ { [ CHAR: A CHAR: Z between? ] [ "#:-" member? ] } 1|| ] all? ;
+    [ { [ char: A char: Z between? ] [ "#:-" member? ] } 1|| ] all? ;
 
 ERROR: colon-word-must-be-all-uppercase-or-lowercase n string word ;
 : read-colon ( n string slice -- n' string colon )
     dup length 1 = [
-        dup prev-char-from-slice { CHAR: \s CHAR: \r CHAR: \n f } member? [
+        dup prev-char-from-slice { char: \s char: \r char: \n f } member? [
             read-til-semicolon
         ] [
             read-lowercase-colon
@@ -404,25 +404,25 @@ MACRO: rules>call-lexer ( seq -- quot: ( n/f string -- n'/f string literal ) )
     '[ _ slice-til-either _ case ] ;
 
 CONSTANT: factor-lexing-rules {
-    T{ line-comment-lexer { generator read-exclamation } { delimiter CHAR: ! } }
-    T{ backtick-lexer { generator read-backtick } { delimiter CHAR: ` } }
-    T{ backslash-lexer { generator read-backslash } { delimiter CHAR: \ } }
-    T{ dquote-lexer { generator read-string } { delimiter CHAR: " } { escape CHAR: \ } }
-    T{ decorator-lexer { generator read-decorator } { delimiter CHAR: @ } }
+    T{ line-comment-lexer { generator read-exclamation } { delimiter char: ! } }
+    T{ backtick-lexer { generator read-backtick } { delimiter char: ` } }
+    T{ backslash-lexer { generator read-backslash } { delimiter char: \ } }
+    T{ dquote-lexer { generator read-string } { delimiter char: " } { escape char: \ } }
+    T{ decorator-lexer { generator read-decorator } { delimiter char: @ } }
     
-    T{ colon-lexer { generator read-colon } { delimiter CHAR: : } }
-    T{ matched-lexer { generator read-bracket } { delimiter CHAR: [ } }
-    T{ matched-lexer { generator read-brace } { delimiter CHAR: { } }
-    T{ matched-lexer { generator read-paren } { delimiter CHAR: ( } }
+    T{ colon-lexer { generator read-colon } { delimiter char: : } }
+    T{ matched-lexer { generator read-bracket } { delimiter char: [ } }
+    T{ matched-lexer { generator read-brace } { delimiter char: { } }
+    T{ matched-lexer { generator read-paren } { delimiter char: ( } }
     
-    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ; } }
-    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ] } }
-    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: } } }
-    T{ terminator-lexer { generator read-terminator } { delimiter CHAR: ) } }
+    T{ terminator-lexer { generator read-terminator } { delimiter char: ; } }
+    T{ terminator-lexer { generator read-terminator } { delimiter char: ] } }
+    T{ terminator-lexer { generator read-terminator } { delimiter char: } } }
+    T{ terminator-lexer { generator read-terminator } { delimiter char: ) } }
     
-    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \s } }
-    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \r } }
-    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter CHAR: \n } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter char: \s } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter char: \r } }
+    T{ whitespace-lexer { generator read-token-or-whitespace } { delimiter char: \n } }
 }
 
 : lex-factor ( n/f string -- n'/f string literal )
@@ -449,16 +449,16 @@ CONSTANT: factor-lexing-rules {
 ! What a lexer body looks like, produced by make-lexer
 : lex ( n/f string -- n'/f string literal )
     "!`\\\"[{(\s\r\n" slice-til-either {
-        { CHAR: ! [ read-exclamation ] }
-        { CHAR: ` [ read-backtick ] }
-        { CHAR: \ [ read-backslash ] }
-        { CHAR: " [ read-string ] }
-        { CHAR: [ [ read-bracket ] }
-        { CHAR: { [ read-brace ] }
-        { CHAR: ( [ read-paren ] }
-        { CHAR: \s [ read-token-or-whitespace ] }
-        { CHAR: \r [ read-token-or-whitespace ] }
-        { CHAR: \n [ read-token-or-whitespace ] }
+        { char: ! [ read-exclamation ] }
+        { char: ` [ read-backtick ] }
+        { char: \ [ read-backslash ] }
+        { char: " [ read-string ] }
+        { char: [ [ read-bracket ] }
+        { char: { [ read-brace ] }
+        { char: ( [ read-paren ] }
+        { char: \s [ read-token-or-whitespace ] }
+        { char: \r [ read-token-or-whitespace ] }
+        { char: \n [ read-token-or-whitespace ] }
         { f [ f like dup [ make-tag-literal ] when ] }
     } case ; inline
 */

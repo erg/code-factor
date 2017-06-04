@@ -13,11 +13,11 @@ IN: find.extras
 
 : matching-delimiter ( ch -- ch' )
     H{
-        { CHAR: ( CHAR: ) }
-        { CHAR: [ CHAR: ] }
-        { CHAR: { CHAR: } }
-        { CHAR: < CHAR: > }
-        { CHAR: : CHAR: ; }
+        { char: ( char: ) }
+        { char: [ char: ] }
+        { char: { char: } }
+        { char: < char: > }
+        { char: : char: ; }
     } ?at drop ;
 
 : matching-delimiter-string ( string -- string' )
@@ -161,15 +161,15 @@ CONSTANT: all-separators $[ whitespace-separators modern-separators append ]
     '[ _ head-from ] dip swap ;
 
 : opening-lua-bracket-from ( seq n -- seq n' slices )
-    { [ tag-from ] [ "[" head-from ] [ [ CHAR: = = ] take-empty-from ] [ "[" head-from ] } 
+    { [ tag-from ] [ "[" head-from ] [ [ char: = = ] take-empty-from ] [ "[" head-from ] } 
     find-quots ;
 
 : opening-lua-brace-from ( seq n -- seq n' slices )
-    { [ tag-from ] [ "{" head-from ] [ [ CHAR: = = ] take-empty-from ] [ "{" head-from ] }
+    { [ tag-from ] [ "{" head-from ] [ [ char: = = ] take-empty-from ] [ "{" head-from ] }
     find-quots ;
 
 : opening-lua-paren-from ( seq n -- seq n' slices )
-    { [ tag-from ] [ "(" head-from ] [ [ CHAR: = = ] take-empty-from ] [ "(" head-from ] }
+    { [ tag-from ] [ "(" head-from ] [ [ char: = = ] take-empty-from ] [ "(" head-from ] }
     find-quots ;
 
 : read-lua-string ( seq n pair -- seq n' )

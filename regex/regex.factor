@@ -94,21 +94,21 @@ SINGLETONS: beginning-of-input ^ end-of-input $ end-of-file
 
 : parse-character-class-first ( -- )
     current {
-        { CHAR: ^ [ negate-character-class advance ] }
+        { char: ^ [ negate-character-class advance ] }
         [ drop ]
     } case ;
 
 : parse-range-start ( -- )
     current {
-        { CHAR: ] [ CHAR: ] <character> push-class advance ] }
-        { CHAR: - [ CHAR: - <character> push-class advance ] }
+        { char: ] [ char: ] <character> push-class advance ] }
+        { char: - [ char: - <character> push-class advance ] }
         [ drop ]
     } case ;
 
 ERROR: bad-range from to ;
 
 : proper-range? ( -- ? )
-    { [ lookahead1 CHAR: - = ] [ lookahead2 "-]" member? not ] } 0&& ;
+    { [ lookahead1 char: - = ] [ lookahead2 "-]" member? not ] } 0&& ;
 
 TUPLE: union-class seq ;
 CONSTRUCTOR: <union-class> union-class ( seq -- obj ) ;
@@ -186,13 +186,13 @@ ERROR: invalid-repetition ;
     advance
     take-integer
     current {
-        { CHAR: , [
+        { char: , [
             advance
             take-integer
-            current CHAR: } = [ invalid-repetition ] unless
+            current char: } = [ invalid-repetition ] unless
             advance
         ] }
-        { CHAR: } [ dup advance ] }
+        { char: } [ dup advance ] }
     } case
     pop-current-regex <repetition> push-current-regex ;
 
@@ -277,7 +277,7 @@ CONSTRUCTOR: <comment> comment ( string -- obj ) ;
         { [ dup "?=" head? ] [ drop 2 advance-n parse-loop \ <positive-lookahead> stack1 ] } ! lookahead
         { [ dup "?!" head? ] [ drop 2 advance-n parse-loop \ <negative-lookahead> stack1 ] } ! negative lookahead
         ! { [ dup "?~" head? ] [ drop 2 advance-n parse-loop ] } ! negation of parentheses group
-        { [ dup "?#" head? ] [ drop 2 advance-n [ current CHAR: ) = not ] take-while <comment> push-current-regex ] } ! comment
+        { [ dup "?#" head? ] [ drop 2 advance-n [ current char: ) = not ] take-while <comment> push-current-regex ] } ! comment
         { [ dup "?:" head? ] [ drop 2 advance-n parse-loop \ <noncapturing> stack1 ] } ! noncapturing
         { [ dup "?>" head? ] [ drop 2 advance-n parse-loop \ <atomic> stack1 ] } ! atomic options (independent/non-capture)
         { [ dup "?-" head? ] [ drop 2 advance-n parse-loop \ <negated-options> stack1 ] } ! minus options
@@ -348,26 +348,26 @@ MEMO: simple-category-table ( -- table )
 
 : lookup-escape ( char -- ast )
     {
-        { CHAR: t [ CHAR: \t <character> ] }
-        { CHAR: n [ CHAR: \n <character> ] }
-        { CHAR: r [ CHAR: \r <character> ] }
-        { CHAR: f [ 0xc <character> ] }
-        { CHAR: a [ 0x7 <character> ] }
-        { CHAR: e [ 0x1b <character> ] }
-        { CHAR: \\ [ CHAR: \\ <character> ] }
+        { char: t [ char: \t <character> ] }
+        { char: n [ char: \n <character> ] }
+        { char: r [ char: \r <character> ] }
+        { char: f [ 0xc <character> ] }
+        { char: a [ 0x7 <character> ] }
+        { char: e [ 0x1b <character> ] }
+        { char: \\ [ char: \\ <character> ] }
 
-        { CHAR: w [ c-identifier-class <primitive-class> ] }
-        { CHAR: W [ c-identifier-class <primitive-class> <not-class> ] }
-        { CHAR: s [ java-blank-class <primitive-class> ] }
-        { CHAR: S [ java-blank-class <primitive-class> <not-class> ] }
-        { CHAR: d [ digit-class <primitive-class> ] }
-        { CHAR: D [ digit-class <primitive-class> <not-class> ] }
+        { char: w [ c-identifier-class <primitive-class> ] }
+        { char: W [ c-identifier-class <primitive-class> <not-class> ] }
+        { char: s [ java-blank-class <primitive-class> ] }
+        { char: S [ java-blank-class <primitive-class> <not-class> ] }
+        { char: d [ digit-class <primitive-class> ] }
+        { char: D [ digit-class <primitive-class> <not-class> ] }
 
-        { CHAR: z [ end-of-input <tagged-epsilon> ] }
-        { CHAR: Z [ end-of-file <tagged-epsilon> ] }
-        { CHAR: A [ beginning-of-input <tagged-epsilon> ] }
-        { CHAR: b [ word-break <tagged-epsilon> ] }
-        { CHAR: B [ word-break <not-class> <tagged-epsilon> ] }
+        { char: z [ end-of-input <tagged-epsilon> ] }
+        { char: Z [ end-of-file <tagged-epsilon> ] }
+        { char: A [ beginning-of-input <tagged-epsilon> ] }
+        { char: b [ word-break <tagged-epsilon> ] }
+        { char: B [ word-break <not-class> <tagged-epsilon> ] }
         [ <character> ]
     } case ;
 
@@ -378,17 +378,17 @@ ERROR: bad-number ;
 : parse-escape ( -- obj )
     advance
     2 lookahead {
-        { "p{" [ 2 advance-n [ current CHAR: } = not ] take-while name>class <primitive-class> advance t ] }
-        { "P{" [ 2 advance-n [ current CHAR: } = not ] take-while name>class <primitive-class> <not-class> advance t ] }
+        { "p{" [ 2 advance-n [ current char: } = not ] take-while name>class <primitive-class> advance t ] }
+        { "P{" [ 2 advance-n [ current char: } = not ] take-while name>class <primitive-class> <not-class> advance t ] }
         [ f ]
     } case
     [
         drop
         current {
-            { CHAR: Q [ advance [ 2 lookahead "\\E" = not ] take-while <concatenation> 2 advance-n ] }
-            { CHAR: u [ advance 4 take hex> ensure-number <character> ] }
-            { CHAR: x [ advance 2 take hex> ensure-number <character> ] }
-            { CHAR: 0 [ advance 3 take oct> ensure-number <character> ] }
+            { char: Q [ advance [ 2 lookahead "\\E" = not ] take-while <concatenation> 2 advance-n ] }
+            { char: u [ advance 4 take hex> ensure-number <character> ] }
+            { char: x [ advance 2 take hex> ensure-number <character> ] }
+            { char: 0 [ advance 3 take oct> ensure-number <character> ] }
             [ lookup-escape advance ]
         } case
     ] unless ;
@@ -396,18 +396,18 @@ ERROR: bad-number ;
 ! # is a comment in free-space mode
 : parse-char ( ch -- )
     {
-        { CHAR: . [ dot push-current-regex advance ] }
-        { CHAR: \ [ parse-escape push-current-regex ] }
-        { CHAR: ? [ \ <maybe> stack1 advance ] }
-        { CHAR: * [ \ <star> stack1 advance ] }
-        { CHAR: + [ \ <plus> stack1 advance ] }
-        { CHAR: | [ \ alternation push-current-regex advance ] }
-        { CHAR: [ [ parse-character-class ] }
-        { CHAR: ( [ advance parse-nested-regex ] }
-        { CHAR: ) [ check-balance finish-nested-regex advance ] }
-        { CHAR: { [ parse-repetition ] }
-        { CHAR: ^ [ ^ <tagged-epsilon> push-current-regex advance ] }
-        { CHAR: $ [ $ <tagged-epsilon> push-current-regex advance ] }
+        { char: . [ dot push-current-regex advance ] }
+        { char: \ [ parse-escape push-current-regex ] }
+        { char: ? [ \ <maybe> stack1 advance ] }
+        { char: * [ \ <star> stack1 advance ] }
+        { char: + [ \ <plus> stack1 advance ] }
+        { char: | [ \ alternation push-current-regex advance ] }
+        { char: [ [ parse-character-class ] }
+        { char: ( [ advance parse-nested-regex ] }
+        { char: ) [ check-balance finish-nested-regex advance ] }
+        { char: { [ parse-repetition ] }
+        { char: ^ [ ^ <tagged-epsilon> push-current-regex advance ] }
+        { char: $ [ $ <tagged-epsilon> push-current-regex advance ] }
         [ <character> push-current-regex advance ]
     } case ;
 

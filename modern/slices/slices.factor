@@ -6,11 +6,11 @@ IN: modern.slices
 
 : matching-delimiter ( ch -- ch' )
     H{
-        { CHAR: ( CHAR: ) }
-        { CHAR: [ CHAR: ] }
-        { CHAR: { CHAR: } }
-        { CHAR: < CHAR: > }
-        { CHAR: : CHAR: ; }
+        { char: ( char: ) }
+        { char: [ char: ] }
+        { char: { char: } }
+        { char: < char: > }
+        { char: : char: ; }
     } ?at drop ;
 
 : matching-delimiter-string ( string -- string' )
@@ -130,7 +130,7 @@ ERROR: unexpected-end n string ;
 
 :: merge-slice-til-eol-slash' ( n string slice -- n' string slice/f ch/f )
     n string merge-slice-til-eol-slash'' :> ( n' string' slice' ch' )
-    ch' CHAR: \ = [
+    ch' char: \ = [
         n' 1 + string' ?nth' "\r\n" member? [
             n' 2 + string' slice slice' span-slices merge-slice-til-eol-slash'
         ] [
@@ -189,9 +189,9 @@ ERROR: subseq-expected-but-got-eof n string expected ;
     [ [ from>> ] [ to>> ] [ seq>> ] tri ] dip
     swap [ + ] dip <slice> ;
 
-! { CHAR: ] [ read-closing ] }
-! { CHAR: } [ read-closing ] }
-! { CHAR: ) [ read-closing ] }
+! { char: ] [ read-closing ] }
+! { char: } [ read-closing ] }
+! { char: ) [ read-closing ] }
 : read-closing ( n string tok -- n string tok )
     dup length 1 = [
         -1 modify-to [ 1 - ] 2dip
