@@ -232,7 +232,7 @@ ERROR: word-not-found word ;
         word-not-found
     ] if ;
 
-GENERIC# lookup-literal 1 ( literal namespace -- obj )
+GENERIC#: lookup-literal 1 ( literal namespace -- obj )
 
 M: tag-literal lookup-literal
     [ tag>> ] dip lookup-in-namespace ;
