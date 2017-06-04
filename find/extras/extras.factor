@@ -269,7 +269,8 @@ ERROR: unmatched-syntax seq n obj delimiter ;
                 { [ ";" head-from ] [ , ] }
                 { [ ">" head-from ] [ , ] }
                 { [ "," head-from ] [ , ] }
-                { [ "#" head-from ] [ , [ "\r\n" member? not ] take-empty-from , ] }
+                { [ "!" head-from ] [ , [ "\r\n" member? not ] take-empty-from , ] }
+                ! { [ "#" head-from ] [ , [ "\r\n" member? not ] take-empty-from , ] }
 
                 { [ "))" head-from ] [ , ] }
                 { [ "}}" head-from ] [ , ] }
@@ -294,6 +295,7 @@ ERROR: unmatched-syntax seq n obj delimiter ;
                 ! Self-matching delimiter
                 { [ tagged-backtick-open-from ] [ % "`" read-until-subseq [ , ] bi@ ] }
                 [ [ "[]{}<>:;,`\\!\"' " member? not ] take-empty-from , ]
+                ! [ [ "[]{}<>:;,`\\!#\"' " member? not ] take-empty-from , ]
             } cond*
         ] when
     ] { } make f like ;
