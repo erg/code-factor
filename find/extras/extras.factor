@@ -1,11 +1,11 @@
 ! Copyright (C) 2017 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors arrays assocs combinators combinators.extras
-combinators.smart fry generalizations kernel literals locals
-macros make math math.private multiline namespaces quotations
-sequences sequences.deep sequences.extras
-sequences.generalizations sequences.private shuffle
-stack-checker.transforms strings unicode words ;
+combinators.short-circuit combinators.smart fry generalizations
+kernel literals locals macros make math math.order math.private
+multiline namespaces quotations sequences sequences.deep
+sequences.extras sequences.generalizations sequences.private
+shuffle stack-checker.transforms strings unicode words ;
 IN: find.extras
 
 : >strings ( seq -- str )
@@ -22,28 +22,6 @@ IN: find.extras
 
 : matching-delimiter-string ( string -- string' )
     [ matching-delimiter ] map ;
-
-SYMBOL: delimiter-stack
-
-: with-delimiter-stack ( string quot -- seq )
-    [ V{ } clone delimiter-stack ] dip with-variable ; inline
-
-: push-delimiter ( delim -- )
-    delimiter-stack get push ;
-
-: peek-delimiter ( -- delim/f )
-    delimiter-stack get [ f ] [ last ] if-empty ;
-
-ERROR: delimiter-mismatch-error got expected ;
-: pop-delimiter ( delim -- )
-    delimiter-stack get pop
-    2dup matching-delimiter-string 2dup sequence= [ 4drop ] [ delimiter-mismatch-error ] if ;
-
-ERROR: unmatched-delimiter delimiter delimiter-string ;
-: check-delimiter-stack ( -- )
-    delimiter-stack get [
-        first dup >string unmatched-delimiter
-    ] unless-empty ;
 
 ERROR: invalid-slice seq from to ;
 : range-empty-slice ( seq from to -- seq n' slice )
@@ -147,11 +125,22 @@ MACRO: find-until-quots ( quots -- quot ) ! : ( seq n -- seq n'/f slice/f ) )
             drop f f
         ] if*
     ] ;
-<<
-CONSTANT: whitespace-separators "\s\t\r\n"
-CONSTANT: modern-separators "[]{}()<>:;,`\\!\"'"
->>
-CONSTANT: all-separators $[ whitespace-separators modern-separators append ]
+
+DEFER: all-separators
+DEFER: whitespace-separators
+
+: upper-tag-from ( seq n -- seq n' slice )
+    {
+        [
+            [
+                {
+                    [ char: A char: Z between? ]
+                    [ char: 0 char: 9 between? ]
+                } 1||
+            ] take-empty-from
+        ]
+        [ [ all-separators member? ] take-from ]
+    } find-quots ;
 
 : tag-from ( seq n -- seq n' slice )
     [ all-separators member? not ] take-empty-from ;
@@ -215,7 +204,6 @@ ERROR: unmatched-syntax seq n obj delimiter ;
        dup last _ sequence= [ _ unmatched-syntax ] unless unclip-last
     ] dip -rot 3array ;
 
-
 :: (read-matching-char-with-escape) ( seq n escape delimiter -- seq' n' )
     seq n guard-length [
         delimiter find-subseq-from [
@@ -240,26 +228,11 @@ ERROR: unmatched-syntax seq n obj delimiter ;
         seq length [ close-delimiter length - ] keep seq <slice>
     ] if ;
 
-:: handle-closing-delimiter ( delim -- delim opening? )
-    peek-delimiter :> peeked
-    delim peeked sequence= [
-        ! } }
-        delimiter-stack get pop* 
-        delim f
-    ] [
-        delim peeked matching-delimiter-string sequence= [
-            ! { }
-            delimiter-stack get pop*
-            delim f
-        ] [
-            delim delimiter-stack get push
-            delim t
-        ] if
-    ] if ;
-
-: handle-open-close-delimiter ( seq n delim -- seq n' )
-    handle-closing-delimiter
-    [ dup , lex-until unclip-last [ , ] bi@ ] [ , ] if ;
+<<
+CONSTANT: whitespace-separators "\s\t\r\n"
+CONSTANT: modern-separators "\"\\ []{}()<>:;!"
+>>
+CONSTANT: all-separators $[ whitespace-separators modern-separators append ]
 
 : lex-token ( seq n -- seq n seq' )
     [
@@ -267,53 +240,31 @@ ERROR: unmatched-syntax seq n obj delimiter ;
             {
                 ! Closing delimiters needed to avoid 0-width tag-from slices
                 { [ ";" head-from ] [ , ] }
-                { [ ">" head-from ] [ , ] }
-                { [ "," head-from ] [ , ] }
                 { [ "!" head-from ] [ , [ "\r\n" member? not ] take-empty-from , ] }
-                ! { [ "#" head-from ] [ , [ "\r\n" member? not ] take-empty-from , ] }
 
-                { [ "))" head-from ] [ , ] }
-                { [ "}}" head-from ] [ , ] }
-                { [ "]]" head-from ] [ , ] }
-                { [ ")" head-from ] [ handle-open-close-delimiter ] }
-                { [ "}" head-from ] [ handle-open-close-delimiter ] }
-                { [ "]" head-from ] [ handle-open-close-delimiter ] }
+                { [ ")" head-from ] [ , ] }
+                { [ "}" head-from ] [ , ] }
+                { [ "]" head-from ] [ , ] }
                 { [ opening-lua-bracket-from ] [ read-lua-string ] }
                 { [ opening-lua-brace-from ] [ read-lua-string ] }
                 { [ opening-lua-paren-from ] [ read-lua-string ] }
                 
-                { [ tagged-bracket-open-from ] [ dup second push-delimiter "]" read-syntax % ] }
-                { [ tagged-brace-open-from ] [ dup second push-delimiter "}" read-syntax % ] }
-                { [ tagged-paren-open-from ] [ dup second push-delimiter ")" read-syntax % ] }
+                { [ tagged-bracket-open-from ] [ "]" read-syntax % ] }
+                { [ tagged-brace-open-from ] [ "}" read-syntax % ] }
+                { [ tagged-paren-open-from ] [ ")" read-syntax % ] }
                 { [ tagged-colon-open-from ] [ ";" read-syntax % ] }
-                ! { [ tagged-sstring-open-from ] [ % "\\" "'" read-matching-char-with-escape [ , ] bi@ ] }
                 { [ tagged-dstring-open-from ] [ % "\\" "\"" read-matching-char-with-escape [ , ] bi@ ] }
-                { [ html-open-from ] [ dup slices-combine matching-closing-tag read-syntax % ] }
-                { [ html-close-from ] [ % ] }
-                { [ html-self-close-from ] [ % ] }
+                ! { [ html-open-from ] [ dup slices-combine matching-closing-tag read-syntax % ] }
+                ! { [ html-close-from ] [ % ] }
+                ! { [ html-self-close-from ] [ % ] }
 
-                ! Self-matching delimiter
-                { [ tagged-backtick-open-from ] [ % "`" read-until-subseq [ , ] bi@ ] }
-                [ [ "[]{}<>:;,`\\!\"' " member? not ] take-empty-from , ]
-                ! [ [ "[]{}<>:;,`\\!#\"' " member? not ] take-empty-from , ]
+                ! { [ tagged-backtick-open-from ] [ % "`" read-until-subseq [ , ] bi@ ] }
+                [ [ all-separators member? not ] take-empty-from , ]
             } cond*
         ] when
     ] { } make f like ;
 
 : lex-tokens ( string -- seq )
-    '[
-        _ 0 [ lex-token ] loop>array 2nip
-        check-delimiter-stack
-    ] with-delimiter-stack ;
+    0 [ lex-token ] loop>array 2nip ;
 
-: lex>strings ( seq -- strings ) [ 0 lex-token ] with-delimiter-stack >strings 2nip ;
-
-: parse-prefix ( string n -- string n' obj )
-    [ blank? ] take-empty-from drop
-    {
-        { [ "-" head-from ] [ ] }
-        { [ "+" head-from ] [ ] }
-        { [ "!" head-from ] [ ] }
-        { [ "~" head-from ] [ ] }
-        [ f ]
-    } cond* ;
+: lex>strings ( seq -- strings ) 0 lex-token >strings 2nip ;

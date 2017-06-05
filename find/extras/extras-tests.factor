@@ -4,13 +4,17 @@ USING: find.extras kernel math.order sequences strings
 tools.test ;
 IN: find.extras.tests
 
-{ { "#" "" } } [ "#" lex>strings ] unit-test
-{ { "#" "asdf" } } [ "#asdf" lex>strings ] unit-test
+{ { "!" "" } } [ "!" lex>strings ] unit-test
+{ { "!" "asdf" } } [ "!asdf" lex>strings ] unit-test
 { { "{" { "1" "2" "3" } "}" } } [ "{ 1 2 3 }" lex>strings ] unit-test
 { { "arr{" { "1" "2" "3" } "}" } } [ "arr{ 1 2 3 }" lex>strings ] unit-test
 { { "quot[" { "1" "2" "3" } "]" } } [ "quot[ 1 2 3 ]" lex>strings ] unit-test
 { { "par(" { "1" "2" "3" } ")" } } [ "par( 1 2 3 )" lex>strings ] unit-test
-{ { "tic" "`" " 1 2 3 " "`" } } [ "tic` 1 2 3 `" lex>strings ] unit-test
+
+! Eventually...
+! { { "#" "" } } [ "#" lex>strings ] unit-test
+! { { "#" "asdf" } } [ "#asdf" lex>strings ] unit-test
+! { { "tic" "`" " 1 2 3 " "`" } } [ "tic` 1 2 3 `" lex>strings ] unit-test
 
 
 {
